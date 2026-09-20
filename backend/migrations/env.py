@@ -8,6 +8,7 @@ import os
 from server.core.config import normalize_database_url
 from server.db.base import Base
 from server.db import models  # noqa: F401  (register tables)
+from server.db.url import ensure_sqlite_parent_directory
 
 config = context.config
 if config.config_file_name is not None:
@@ -30,7 +31,9 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(_url(), poolclass=pool.NullPool)
+    url = _url()
+    ensure_sqlite_parent_directory(url)
+    engine = create_engine(url, poolclass=pool.NullPool)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
         with context.begin_transaction():

@@ -130,16 +130,35 @@ def test_probe_timeout_degrades_instead_of_raising(env):
 
 def test_migrations_run_without_any_other_app_configuration(tmp_path):
     """Regression (Railway): `alembic upgrade head` failed because Settings validation demanded R2 credentials.
-    Migrations must work with DATABASE_URL alone, even when storage/auth settings are incomplete or invalid."""
+    Migrations must work with DATABASE_URL alone, even when storage/auth settings are incomplete or invalid,
+    and must create a missing parent directory for a file-backed SQLite database."""
     import os
     import subprocess
     import sys
 
+    database = tmp_path / "missing" / "parent" / "m.db"
     env = {k: v for k, v in os.environ.items() if not k.startswith(("R2_", "DEV_API", "STORAGE", "APP_ENV", "DATABASE"))}
-    env.update({"APP_ENV": "production", "STORAGE_BACKEND": "r2", "DATABASE_URL": f"sqlite:///{(tmp_path / 'm.db').as_posix()}"})
+    env.update({"APP_ENV": "production", "STORAGE_BACKEND": "r2", "DATABASE_URL": f"sqlite:///{database.as_posix()}"})
     proc = subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=BACKEND, env=env, capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr[-800:]
-    assert "generations" in inspect(create_engine(f"sqlite:///{(tmp_path / 'm.db').as_posix()}")).get_table_names()
+    assert "generations" in inspect(create_engine(f"sqlite:///{database.as_posix()}")).get_table_names()
+
+
+def test_application_engine_creates_sqlite_parent_directory(tmp_path, monkeypatch):
+    from server.core.config import reset_settings_cache
+    from server.db.session import get_engine, reset_engine_cache
+
+    database = tmp_path / "missing" / "application" / "app.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database.as_posix()}")
+    reset_settings_cache()
+    reset_engine_cache()
+    try:
+        with get_engine().connect() as connection:
+            connection.exec_driver_sql("SELECT 1")
+        assert database.is_file()
+    finally:
+        reset_engine_cache()
+        reset_settings_cache()
 
 
 def test_postgres_url_variants_are_normalized():

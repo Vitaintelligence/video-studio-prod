@@ -82,6 +82,7 @@ RUN mkdir -p /workspace/storage /workspace/agent-logs /app/openmontage/projects 
 
 ENV PYTHONPATH=/app:/app/openmontage \
     HOME=/home/app \
+    DATABASE_URL=sqlite+pysqlite:////workspace/storage/dev.db \
     STORAGE_BACKEND=local \
     LOCAL_STORAGE_PATH=/workspace/storage \
     AGENT_TRANSCRIPT_DIR=/workspace/agent-logs \

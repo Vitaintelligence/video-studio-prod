@@ -64,6 +64,9 @@ keeps checkpoints, schema validation, self-review, cost governance and render ve
 See [.env.example](.env.example) (provider variables are copied verbatim from upstream's `.env.example`). Key points:
 
 - `DATABASE_URL` accepts Railway's `postgresql://` form. `ENABLE_API_DOCS` defaults to off in production.
+- The container fallback is SQLite at `/workspace/storage/dev.db`; its parent directory is created automatically. This is
+  useful for a single-container trial or an attached volume, but API + worker deployments must share Postgres by setting
+  `DATABASE_URL` on both services.
 - Production requires `DEV_API_TOKEN` (>= 24 chars); the app refuses to start otherwise.
 - `STORAGE_BACKEND=r2` needs `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. With
   `R2_PUBLIC_BASE_URL` set, URLs are public/CDN; without it they are signed and expire after `SIGNED_URL_TTL_SECONDS`.
