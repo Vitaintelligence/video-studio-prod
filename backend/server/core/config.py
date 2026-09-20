@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     r2_public_base_url: str | None = Field(default=None, validation_alias=AliasChoices("S3_PUBLIC_BASE_URL", "R2_PUBLIC_BASE_URL"))
     # R2 uses "auto". Supabase / AWS need the real region of the project/bucket (e.g. "us-east-1", "ap-south-1").
     r2_region: str = Field(default="auto", validation_alias=AliasChoices("S3_REGION", "R2_REGION"))
+    # "path": endpoint/bucket/key (Supabase, R2, MinIO). "virtual": bucket.endpoint/key (Railway Buckets, AWS).
+    s3_addressing_style: Literal["path", "virtual", "auto"] = Field(
+        default="path", validation_alias=AliasChoices("S3_ADDRESSING_STYLE", "R2_ADDRESSING_STYLE"))
     signed_url_ttl_seconds: int = 3600
 
     # --- limits ------------------------------------------------------------
@@ -130,6 +133,17 @@ class Settings(BaseSettings):
     def _split_origins(cls, v):
         if isinstance(v, str):
             return [o.strip() for o in v.split(",") if o.strip()]
+        return v
+
+    @field_validator("s3_addressing_style", mode="before")
+    @classmethod
+    def _normalize_addressing_style(cls, v):
+        if isinstance(v, str):
+            v = v.strip().lower().replace("_", "-")
+            if v in ("virtual-hosted", "virtual-hosted-style", "virtual-host", "vhost"):
+                return "virtual"
+            if v in ("path-style", ""):
+                return "path"
         return v
 
     @field_validator("database_url")

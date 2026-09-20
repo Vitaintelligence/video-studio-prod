@@ -157,8 +157,8 @@ class R2Storage(StorageService):
                 aws_access_key_id=settings.r2_access_key_id.get_secret_value(),
                 aws_secret_access_key=settings.r2_secret_access_key.get_secret_value(),
                 region_name=settings.r2_region,
-                # path-style addressing (endpoint/bucket/key): required by Supabase, accepted by R2 and MinIO
-                config=Config(signature_version="s3v4", s3={"addressing_style": "path"},
+                # path style suits Supabase/R2/MinIO; Railway Buckets need virtual-hosted (S3_ADDRESSING_STYLE=virtual)
+                config=Config(signature_version="s3v4", s3={"addressing_style": settings.s3_addressing_style},
                               retries={"max_attempts": 4, "mode": "standard"}),
             )
         self.client = client

@@ -172,3 +172,23 @@ def test_original_r2_env_names_still_work_and_missing_credentials_are_reported(m
     monkeypatch.delenv("R2_BUCKET")
     with pytest.raises(ValueError, match="S3_BUCKET"):
         Settings(_env_file=None)
+
+
+def test_railway_bucket_style_uses_virtual_hosted_urls(monkeypatch):
+    """Railway Buckets reject path-style requests; S3_ADDRESSING_STYLE=virtual puts the bucket in the hostname."""
+    from urllib.parse import urlparse
+
+    from server.core.config import Settings
+
+    for k, v in {"STORAGE_BACKEND": "s3", "S3_ENDPOINT_URL": "https://t3.storageapi.dev", "S3_ACCESS_KEY_ID": "AKIDTEST",
+                 "S3_SECRET_ACCESS_KEY": "secret", "S3_BUCKET": "video-studio-media", "S3_REGION": "auto",
+                 "S3_ADDRESSING_STYLE": "virtual"}.items():
+        monkeypatch.setenv(k, v)
+    s = Settings(_env_file=None)
+    assert s.s3_addressing_style == "virtual"
+    parsed = urlparse(R2Storage(s).presign_upload("uploads/dev/abc/clip.mp4", "video/mp4", 600).url)
+    assert parsed.netloc == "video-studio-media.t3.storageapi.dev" and parsed.path == "/uploads/dev/abc/clip.mp4"
+    monkeypatch.setenv("S3_ADDRESSING_STYLE", "virtual-hosted")
+    assert Settings(_env_file=None).s3_addressing_style == "virtual"
+    monkeypatch.delenv("S3_ADDRESSING_STYLE")
+    assert Settings(_env_file=None).s3_addressing_style == "path"  # the default is unchanged for Supabase/R2
