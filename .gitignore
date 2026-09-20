@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+mobile/dart_defines.local.json
 *.pem
 dev.db
 *.db-journal

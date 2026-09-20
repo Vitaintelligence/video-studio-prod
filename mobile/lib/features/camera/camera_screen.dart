@@ -44,8 +44,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
       session.handleInterruption().then((started) {
         if (started && mounted) context.pushReplacement(Routes.upload);
       });
-    } else if (lifecycle == AppLifecycleState.resumed && !ref.read(cameraSessionProvider).isRecording) {
-      session.open();
+    } else if (lifecycle == AppLifecycleState.resumed) {
+      final phase = ref.read(cameraSessionProvider).phase;
+      if (phase == CameraPhase.opening || phase == CameraPhase.ready) session.open();
     }
   }
 
@@ -95,7 +96,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
                     borderRadius: AppRadius.mediaAll,
                     child: ColoredBox(
                       color: AppColors.surface,
-                      child: state.phase == CameraPhase.opening ? const LoadingView() : Center(child: _Preview()),
+                      child: state.phase == CameraPhase.opening
+                          ? const LoadingView(label: 'Starting camera')
+                          : const SizedBox.expand(child: _Preview()),
                     ),
                   ),
                 ),
@@ -110,6 +113,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
 }
 
 class _Preview extends ConsumerWidget {
+  const _Preview();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final camera = ref.watch(cameraGatewayProvider);

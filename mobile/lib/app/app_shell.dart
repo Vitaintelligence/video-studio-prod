@@ -25,7 +25,11 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: keyboardOpen
           ? null
           : DecoratedBox(
-              decoration: const BoxDecoration(color: AppColors.surface),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.surfaceBorder)),
+                boxShadow: [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, -8))],
+              ),
               child: SafeArea(
                 top: false,
                 child: SizedBox(
@@ -79,7 +83,11 @@ class _CameraAction extends StatelessWidget {
             child: Container(
               width: 64,
               height: 48,
-              decoration: const BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.mediumAll),
+              decoration: const BoxDecoration(
+                gradient: AppColors.brandGradient,
+                borderRadius: AppRadius.mediumAll,
+                boxShadow: [BoxShadow(color: Color(0x66765CF6), blurRadius: 18, offset: Offset(0, 6))],
+              ),
               child: const Icon(CupertinoIcons.camera_fill, size: 24, color: AppColors.onAccent),
             ),
           ),
@@ -106,7 +114,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.textPrimary : AppColors.textMuted;
+    final color = selected ? AppColors.accentText : AppColors.textMuted;
     return Expanded(
       child: Semantics(
         button: true,

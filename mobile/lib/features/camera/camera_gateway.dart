@@ -51,9 +51,15 @@ class PluginCameraGateway implements CameraGateway {
       canFlip =
           _cameras.any((c) => c.lensDirection == CameraLensDirection.front) &&
           _cameras.any((c) => c.lensDirection == CameraLensDirection.back);
-      final controller = CameraController(description, ResolutionPreset.high, enableAudio: true);
+      final controller = CameraController(
+        description,
+        ResolutionPreset.high,
+        enableAudio: true,
+        imageFormatGroup: ImageFormatGroup.yuv420,
+      );
       _controller = controller;
       await controller.initialize();
+      await controller.prepareForVideoRecording();
       hasTorch = description.lensDirection == CameraLensDirection.back;
     } on CameraException catch (e) {
       _controller = null;
@@ -63,12 +69,37 @@ class PluginCameraGateway implements CameraGateway {
   }
 
   @override
-  Widget preview() => CameraPreview(_controller!);
+  Widget preview() {
+    final controller = _controller;
+    final previewSize = controller?.value.previewSize;
+    if (controller == null || previewSize == null || !controller.value.isInitialized) {
+      return const SizedBox.expand();
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final portrait = constraints.maxHeight >= constraints.maxWidth;
+        final width = portrait ? previewSize.height : previewSize.width;
+        final height = portrait ? previewSize.width : previewSize.height;
+        return ClipRect(
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(width: width, height: height, child: CameraPreview(controller)),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Future<void> startRecording() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized || controller.value.isRecordingVideo) {
+      throw const CameraFailure(CameraFailureKind.failed);
+    }
     try {
-      await _controller!.startVideoRecording();
+      await controller.startVideoRecording();
     } on CameraException {
       throw const CameraFailure(CameraFailureKind.failed);
     }
@@ -76,8 +107,12 @@ class PluginCameraGateway implements CameraGateway {
 
   @override
   Future<RecordedVideo> stopRecording() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isRecordingVideo) {
+      throw const CameraFailure(CameraFailureKind.failed);
+    }
     try {
-      final file = await _controller!.stopVideoRecording();
+      final file = await controller.stopVideoRecording();
       return RecordedVideo(path: file.path, sizeBytes: await File(file.path).length());
     } on CameraException {
       throw const CameraFailure(CameraFailureKind.failed);
@@ -97,6 +132,7 @@ class PluginCameraGateway implements CameraGateway {
   Future<void> close() async {
     final c = _controller;
     _controller = null;
+    hasTorch = false;
     await c?.dispose();
   }
 }

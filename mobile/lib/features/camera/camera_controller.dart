@@ -53,18 +53,37 @@ const maxRecording = Duration(minutes: 5);
 class CameraSession extends Notifier<CameraState> {
   Timer? _ticker;
   final Stopwatch _clock = Stopwatch();
-
-  CameraGateway get _camera => ref.read(cameraGatewayProvider);
+  late final CameraGateway _camera;
+  Future<void>? _opening;
 
   @override
   CameraState build() {
+    // Watching (rather than reading) keeps the auto-disposed hardware gateway
+    // alive for the entire camera session. Otherwise it can be disposed between
+    // initialization and the first preview frame on slower Android devices.
+    _camera = ref.watch(cameraGatewayProvider);
     ref.onDispose(() => _ticker?.cancel());
     return const CameraState();
   }
 
   Future<void> open({bool? front}) async {
+    // Lifecycle callbacks can race the initial Android permission dialog. Share
+    // the in-flight open instead of closing and reopening the camera underneath it.
+    final inFlight = _opening;
+    if (inFlight != null) return inFlight;
+
     final useFront = front ?? state.front;
     state = state.copyWith(phase: CameraPhase.opening, front: useFront, torch: false);
+    final operation = _openCamera(useFront);
+    _opening = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_opening, operation)) _opening = null;
+    }
+  }
+
+  Future<void> _openCamera(bool useFront) async {
     try {
       await _camera.open(front: useFront);
       if (!ref.mounted) return;
@@ -148,7 +167,13 @@ class CameraSession extends Notifier<CameraState> {
   /// The app left the foreground: keep what was recorded rather than losing it, then free the camera.
   Future<bool> handleInterruption() async {
     if (state.isRecording) return stopAndClean();
+    // A system permission sheet can pause Android while open() is still
+    // initializing. Let that operation finish instead of disposing it midway.
+    if (state.phase == CameraPhase.opening || state.phase == CameraPhase.saving) return false;
     await _camera.close();
+    if (ref.mounted && state.phase == CameraPhase.ready) {
+      state = state.copyWith(phase: CameraPhase.opening, torch: false);
+    }
     return false;
   }
 }

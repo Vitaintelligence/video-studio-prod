@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'providers.dart';
 
+import '../core/design/app_colors.dart';
 import '../core/design/app_theme.dart';
 import 'router.dart';
 
@@ -29,6 +31,15 @@ class _AdCutAppState extends ConsumerState<AdCutApp> {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       routerConfig: _router,
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: AppColors.background,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }
