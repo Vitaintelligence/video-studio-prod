@@ -1,0 +1,83 @@
+# Local development stack:  docker compose up --build
+#   API      http://localhost:8000   (docs at /docs in development)
+#   Postgres/Redis are bound to 127.0.0.1 only (for local tooling); other containers use the network.
+#
+# The worker uses the ZERO-COST mock runtime by default so the whole pipeline can be exercised
+# without spending money. To run real generations put ANTHROPIC_API_KEY (+ provider keys) in
+# backend/.env and start with:  ORCHESTRATOR_PROVIDER=claude_agent_sdk docker compose up --build
+
+x-backend-env: &backend-env
+  APP_ENV: development
+  DATABASE_URL: postgresql://app:app@postgres:5432/app
+  REDIS_URL: redis://redis:6379/0
+  STORAGE_BACKEND: local
+  LOCAL_STORAGE_PATH: /workspace/storage
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    command: ["./scripts/start-api.sh"]
+    environment:
+      <<: *backend-env
+      RUN_MIGRATIONS: "true"
+      DEV_API_TOKEN: ${DEV_API_TOKEN:-dev-token-change-me-0123456789abcdef}
+      ORCHESTRATOR_PROVIDER: ${ORCHESTRATOR_PROVIDER:-mock}
+    ports: ["8000:8000"]
+    volumes: [storage:/workspace/storage]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  worker:
+    build: ./backend
+    command: ["./scripts/start-worker.sh"]
+    # Provider/Anthropic keys are passed to the worker ONLY (never the api service).
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      <<: *backend-env
+      ORCHESTRATOR_PROVIDER: ${ORCHESTRATOR_PROVIDER:-mock}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+    volumes:
+      - storage:/workspace/storage
+      - agentlogs:/workspace/agent-logs
+    stop_grace_period: 60s
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      api: {condition: service_healthy}   # api applies migrations first
+
+volumes:
+  pgdata:
+  storage:
+  agentlogs:

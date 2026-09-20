@@ -1,0 +1,239 @@
+# LOCAL MODIFICATION (not upstream): consumer-app / headless pipeline.
+#
+# Derived from pipeline_defs/cinematic.yaml. It reuses the upstream cinematic
+# stage-director skills and tools unchanged. What differs:
+#   * No human approval gates (human_approval_default: false everywhere). The
+#     mobile app cannot answer a terminal prompt, and the upstream checkpoint
+#     writer would otherwise refuse to write `completed` checkpoints. No
+#     approval is ever faked; the gates are simply not part of this pipeline.
+#   * The `publish` stage is dropped. It only packages metadata for a human
+#     publisher; the server validates and delivers the final MP4 itself.
+#   * Research is capped to keep consumer latency and cost bounded.
+#   * Schema validation, self-review, checkpointing, cost governance and
+#     render verification are all kept.
+name: app-cinematic
+version: "1.0"
+description: >
+  Autonomous text-to-video pipeline for the consumer app. Turns a short
+  creative brief into a finished vertical/square/landscape video with generated
+  or stock visuals, narration, captions and music, with no interactive
+  approval gates. Quality review, schema validation and cost governance remain.
+category: cinematic
+stability: production
+default_checkpoint_policy: auto_noncreative
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/cinematic/executive-producer
+  budget_default_usd: 2.00
+  max_revisions_per_stage: 2
+  max_send_backs: 2
+  max_wall_time_minutes: 30
+
+extensions:
+  custom_scripts: false
+  custom_playbooks: false
+  custom_skills: false
+  custom_tools: false
+
+required_skills:
+  - pipelines/cinematic/executive-producer
+  - pipelines/cinematic/research-director
+  - pipelines/cinematic/proposal-director
+  - pipelines/cinematic/script-director
+  - pipelines/cinematic/scene-director
+  - pipelines/cinematic/asset-director
+  - pipelines/cinematic/edit-director
+  - pipelines/cinematic/compose-director
+  - meta/reviewer
+  - meta/checkpoint-protocol
+  - meta/animation-runtime-selector
+
+compatible_playbooks:
+  recommended:
+    - flat-motion-graphics
+  also_works:
+    - clean-professional
+    - minimalist-diagram
+  custom_allowed: false
+
+stages:
+  - name: research
+    skill: pipelines/cinematic/research-director
+    produces:
+      - research_brief
+    tools_available:
+      - web_search
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Visual references are specific and relevant to the mood
+      - Sound and music direction is substantive, not generic
+      - Motion commitment is honest about available capabilities
+      - At least 3 genuinely different cinematic directions identified
+    success_criteria:
+      - Schema-valid research_brief artifact
+
+  - name: proposal
+    skill: pipelines/cinematic/proposal-director
+    required_artifacts_in:
+      - research_brief
+    produces:
+      - proposal_packet
+      - decision_log
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Delivery shape is realistic for the available tools and the server budget
+      - Motion-required delivery is explicitly identified when applicable
+      - Delivery promise is explicit and honest
+      - Renderer family is selected and locked
+      - Music plan is resolved
+      - Selected concept is recorded in decision_log with the reason it was chosen
+    success_criteria:
+      - Schema-valid proposal_packet artifact
+      - Delivery promise present with motion_required flag
+      - Cost estimate includes per-item breakdown and stays within the server budget
+
+  - name: script
+    skill: pipelines/cinematic/script-director
+    required_artifacts_in:
+      - proposal_packet
+    produces:
+      - script
+    optional_tools:
+      - transcriber
+      - scene_detect
+    tools_available:
+      - transcriber
+      - scene_detect
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Beat map escalates cleanly
+      - Dialogue or title-card usage is sparse and purposeful
+      - Total duration matches the requested duration
+    success_criteria:
+      - Schema-valid script artifact
+      - Script sections map to identifiable cinematic beats
+
+  - name: scene_plan
+    skill: pipelines/cinematic/scene-director
+    required_artifacts_in:
+      - script
+    optional_artifacts_in:
+      - proposal_packet
+    produces:
+      - scene_plan
+    optional_tools:
+      - frame_sampler
+      - scene_detect
+    tools_available:
+      - frame_sampler
+      - scene_detect
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Hero frames and reveal moments are defined
+      - Aspect ratio matches the requested aspect ratio
+      - Transition choices support the mood
+    success_criteria:
+      - Schema-valid scene_plan artifact
+      - Every beat has a scene treatment and asset path
+
+  - name: assets
+    skill: pipelines/cinematic/asset-director
+    required_artifacts_in:
+      - scene_plan
+    optional_artifacts_in:
+      - script
+      - brief
+    produces:
+      - asset_manifest
+    optional_tools:
+      - subtitle_gen
+      - audio_enhance
+      - image_selector
+      - video_selector
+      - tts_selector
+      - pixabay_music
+      - freesound_music
+      - music_gen
+    tools_available:
+      - subtitle_gen
+      - audio_enhance
+      - image_selector
+      - video_selector
+      - tts_selector
+      - pixabay_music
+      - freesound_music
+      - music_gen
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Motion-required beats use actual video clips rather than still-image substitutes
+      - Music and ambience plan matches the beat map
+      - Total cost stays within the server budget
+      - All referenced asset files exist on disk
+    success_criteria:
+      - Schema-valid asset_manifest artifact
+      - All referenced asset files exist on disk
+
+  - name: edit
+    skill: pipelines/cinematic/edit-director
+    required_artifacts_in:
+      - scene_plan
+      - asset_manifest
+    optional_artifacts_in:
+      - script
+    produces:
+      - edit_decisions
+    tools_available: []
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Emotional pacing is preserved
+      - Strong moments are not overcut or overcovered
+      - Captions are enabled only when requested
+    success_criteria:
+      - Schema-valid edit_decisions artifact
+      - Edit decisions cover the full planned runtime
+
+  - name: compose
+    skill: pipelines/cinematic/compose-director
+    required_artifacts_in:
+      - edit_decisions
+      - asset_manifest
+    optional_artifacts_in:
+      - scene_plan
+    produces:
+      - render_report
+      - final_review
+    required_tools:
+      - video_compose
+      - audio_mixer
+    optional_tools:
+      - video_stitch
+      - video_trimmer
+      - color_grade
+      - audio_enhance
+    tools_available:
+      - video_compose
+      - hyperframes_compose
+      - audio_mixer
+      - video_stitch
+      - video_trimmer
+      - color_grade
+      - audio_enhance
+    checkpoint_required: true
+    human_approval_default: false
+    review_focus:
+      - Output mood matches intended pacing and grade
+      - Motion-required delivery was preserved without silent fallback
+      - Audio dynamics are controlled and intelligible
+      - "render_runtime in edit_decisions matches proposal_packet - silent swap is a CRITICAL governance violation"
+      - Final video is written to renders/final.mp4 inside the project workspace
+    success_criteria:
+      - Schema-valid render_report artifact
+      - Output file exists at renders/final.mp4 and passes ffprobe validation

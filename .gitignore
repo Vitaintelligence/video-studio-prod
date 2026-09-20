@@ -1,0 +1,29 @@
+# secrets / local state
+.env
+.env.*
+!.env.example
+*.pem
+dev.db
+*.db-journal
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# node
+node_modules/
+
+# generated at runtime
+backend/openmontage/projects/
+backend/openmontage/music_library/
+backend/openmontage/remotion-composer/out/
+storage/
+workspace/
+agent-logs/
+
+# scratch
+_upstream/
+.claude/settings.local.json

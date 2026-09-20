@@ -1,0 +1,17 @@
+# Backend server dependencies (API + worker). Installed AFTER the upstream
+# OpenMontage requirements (openmontage/requirements.txt), into the same venv.
+# Pins are the versions resolved and tested together with the OpenMontage
+# requirements; OpenMontage's own (lower-bound) requirements are left untouched.
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic-settings==2.15.0
+SQLAlchemy==2.0.54
+alembic==1.20.0
+psycopg[binary]==3.3.6
+redis==6.4.0
+celery[redis]==5.6.3
+boto3==1.43.98
+httpx==0.28.1
+structlog==26.1.0
+PyYAML>=6.0
+claude-agent-sdk==0.2.157
