@@ -107,7 +107,7 @@ def test_env_example_has_required_keys_no_secrets_and_only_real_provider_vars():
                 "ANTHROPIC_API_KEY", "OPENMONTAGE_PIPELINE", "MAX_JOB_BUDGET_USD", "WORKER_CONCURRENCY",
                 "GENERATION_SOFT_TIMEOUT_SECONDS", "GENERATION_HARD_TIMEOUT_SECONDS", "STORAGE_BACKEND", "LOCAL_STORAGE_PATH",
                 "LOCAL_JOB_RETENTION_HOURS", "S3_ENDPOINT_URL", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_BUCKET",
-                "S3_PUBLIC_BASE_URL"}
+                "S3_ADDRESSING_STYLE", "S3_PUBLIC_BASE_URL"}
     assert required <= names(mine)
     upstream = names(BACKEND / "openmontage" / ".env.example")
     assert {"FAL_KEY", "ELEVENLABS_API_KEY", "KLING_API_KEY", "PEXELS_API_KEY"} <= upstream & names(mine)

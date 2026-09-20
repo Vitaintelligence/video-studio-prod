@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     r2_public_base_url: str | None = Field(default=None, validation_alias=AliasChoices("S3_PUBLIC_BASE_URL", "R2_PUBLIC_BASE_URL"))
     # R2 uses "auto". Supabase / AWS need the real region of the project/bucket (e.g. "us-east-1", "ap-south-1").
     r2_region: str = Field(default="auto", validation_alias=AliasChoices("S3_REGION", "R2_REGION"))
+    # Supabase requires path-style URLs; Railway Buckets and AWS use virtual-hosted URLs.
+    s3_addressing_style: Literal["path", "virtual", "auto"] = Field(
+        default="path", validation_alias=AliasChoices("S3_ADDRESSING_STYLE", "R2_ADDRESSING_STYLE")
+    )
     signed_url_ttl_seconds: int = 3600
 
     # --- limits ------------------------------------------------------------
