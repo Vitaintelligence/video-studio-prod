@@ -156,16 +156,19 @@ class Settings(BaseSettings):
             ]
             if missing:
                 raise ValueError(f"STORAGE_BACKEND={self.storage_backend} requires {', '.join(missing)} (R2_* names also accepted)")
-        if self.is_production:
+        if self.is_production and self.orchestrator_provider == "mock":
+            raise ValueError(
+                "ORCHESTRATOR_PROVIDER=mock only renders a 2-second test pattern (it never touches the uploaded video) "
+                "and is refused when APP_ENV=production. Use local_edit (real editing, no Anthropic key) or claude_agent_sdk."
+            )
+        return self
+
+    def assert_api_ready(self) -> None:
+        """Checks that only the public API needs. The worker holds no client credential, so it must not require one."""
+        if self.is_production and self.auth_mode == "dev_token":
             token = self.dev_api_token.get_secret_value() if self.dev_api_token else ""
             if len(token) < 24:
-                raise ValueError(
-                    "production requires DEV_API_TOKEN (>= 24 chars) while AUTH_MODE=dev_token"
-                )
-            if self.storage_backend == "local":
-                # Allowed (e.g. a volume) but loudly discouraged; see README.
-                pass
-        return self
+                raise ValueError("production requires DEV_API_TOKEN (>= 24 chars) on the api service while AUTH_MODE=dev_token")
 
     @property
     def uses_object_storage(self) -> bool:

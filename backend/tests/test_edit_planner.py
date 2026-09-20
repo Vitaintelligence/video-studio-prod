@@ -48,3 +48,17 @@ def test_overlay_text_is_whitelisted_no_shell_or_filter_metacharacters():
     assert clean_overlay_text("   ") is None
     p = plan_edit("Add a CTA", cta_text="50% off: today only!!! {x}")
     assert "%" not in p.cta_text and "{" not in p.cta_text
+
+
+APP_CLEAN_INSTRUCTION = (
+    "Clean this up. Remove retakes and mistakes, keep only the best take of each line, "
+    "and remove dead air and awkward pauses."
+)  # must equal EditIntent.cleanInstruction in mobile/lib/core/intents/edit_intent.dart
+
+
+def test_the_apps_clean_instruction_picks_best_takes_and_removes_gaps_without_speeding_up_or_shortening():
+    plan = plan_edit(APP_CLEAN_INSTRUCTION)
+    assert plan.best_takes and plan.remove_silence
+    assert plan.speed_all == 1.0 and not plan.speed_opening and not plan.shorten
+    assert plan.target_duration_seconds is None and plan.trim_start_seconds == 0.0
+    assert plan.deterministic_only and not plan.generative_prompts

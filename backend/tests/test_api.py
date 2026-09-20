@@ -52,12 +52,35 @@ def test_auth_required_for_v1(client):
 def test_production_requires_strong_token(env, monkeypatch):
     import pytest
 
+    from server.api.main import create_app
     from server.core.config import Settings
 
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "local_edit")
     monkeypatch.delenv("DEV_API_TOKEN")
-    with pytest.raises(ValueError):
+    settings = Settings(_env_file=None)  # the worker never holds a client token, so loading settings must succeed
+    with pytest.raises(ValueError, match="DEV_API_TOKEN"):
+        create_app(settings)
+    monkeypatch.setenv("DEV_API_TOKEN", "short")
+    with pytest.raises(ValueError, match="DEV_API_TOKEN"):
+        create_app(Settings(_env_file=None))
+
+
+def test_mock_runtime_is_refused_in_production_so_a_test_clip_can_never_be_served_as_a_result(env, monkeypatch):
+    """Regression: a worker running the mock runtime returned a 2-second test pattern for a real upload."""
+    import pytest
+
+    from server.core.config import Settings
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "mock")
+    with pytest.raises(ValueError, match="ORCHESTRATOR_PROVIDER=mock"):
         Settings(_env_file=None)
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "local_edit")
+    assert Settings(_env_file=None).orchestrator_provider == "local_edit"
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "mock")
+    assert Settings(_env_file=None).orchestrator_provider == "mock"  # still fine for local development
 
 
 def test_docs_disabled_in_production(env, monkeypatch):
@@ -65,6 +88,7 @@ def test_docs_disabled_in_production(env, monkeypatch):
     from server.core.config import Settings
 
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "local_edit")
     s = Settings(_env_file=None)
     assert s.docs_enabled is False
     app = create_app(s)
@@ -317,6 +341,7 @@ def test_uploads_unavailable_with_local_storage_in_production(env, monkeypatch, 
     from tests.conftest import TEST_TOKEN
 
     monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "local_edit")
     app = create_app(Settings(_env_file=None))
     limiter = RateLimiter(fake_redis)
     app.state.get_redis = lambda: fake_redis

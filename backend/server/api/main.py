@@ -107,6 +107,7 @@ class RequestContextMiddleware:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    settings.assert_api_ready()
     configure_logging(settings.log_level, json_logs=settings.is_production)
 
     @asynccontextmanager

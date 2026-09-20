@@ -21,6 +21,7 @@ from server.services.output_validation import validate_output
 from server.services.storage import LocalStorage
 from server.worker.tasks import execute_generation
 from tests.conftest import FIXTURE_VIDEO
+from tests.test_edit_planner import APP_CLEAN_INSTRUCTION
 
 pytestmark = pytest.mark.skipif(
     not shutil.which("ffmpeg") or importlib.util.find_spec("faster_whisper") is None,
@@ -78,9 +79,10 @@ class StubProvider:
         return self.reply
 
 
-def test_messy_37s_clip_becomes_a_clean_cut_with_only_the_best_takes(client, upload_asset, real_engine):
+@pytest.mark.parametrize("instruction", [BRIEF, APP_CLEAN_INSTRUCTION], ids=["typed-brief", "app-clean-button"])
+def test_messy_37s_clip_becomes_a_clean_cut_with_only_the_best_takes(client, upload_asset, real_engine, instruction):
     a = upload_asset(MESSY)
-    eid = _create(client, a["id"])
+    eid = _create(client, a["id"], instruction=instruction)
     assert _run(real_engine, eid) == "completed"
 
     st = client.get(f"/v1/edits/{eid}").json()
