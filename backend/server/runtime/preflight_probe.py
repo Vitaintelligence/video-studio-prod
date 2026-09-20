@@ -9,6 +9,7 @@ credentials, env values or install instructions.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 
@@ -31,6 +32,7 @@ def main() -> int:
             capabilities=caps,
             composition_runtimes=runtimes,
             warning_count=len(summary.get("runtime_warnings", [])),
+            whisper=importlib.util.find_spec("faster_whisper") is not None,
         )
     except Exception as exc:  # report class only; details go to stderr
         out["error"] = type(exc).__name__

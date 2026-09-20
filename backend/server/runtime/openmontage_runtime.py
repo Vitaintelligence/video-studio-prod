@@ -105,7 +105,7 @@ def find_final_output(project_dir: Path, last_stage: str = "compose") -> Path | 
 
 
 # Variables the agent process always needs (and nothing else from the worker env).
-_BASE_ENV = ("PATH", "LANG", "LC_ALL", "TZ", "TMPDIR", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "NODE_EXTRA_CA_CERTS", "VIRTUAL_ENV")
+_BASE_ENV = ("PATH", "LANG", "LC_ALL", "TZ", "TMPDIR", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "NODE_EXTRA_CA_CERTS", "VIRTUAL_ENV", "HF_HOME", "HUGGINGFACE_HUB_CACHE", "TRANSCRIBE_MODEL")
 
 
 def provider_env_names(engine_dir: Path) -> list[str]:

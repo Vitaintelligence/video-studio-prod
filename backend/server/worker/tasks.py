@@ -31,12 +31,13 @@ from server.runtime.openmontage_runtime import (
     purge_old_workspaces,
     safe_project_id,
 )
+from server.services import edit_service as edits
 from server.services import generation_service as svc
 from server.services.checkpoint_monitor import CheckpointMonitor
 from server.services.output_validation import OutputInvalid, extract_thumbnail, validate_output
 from server.services.pipelines import stage_order
 from server.services.queue import TASK_NAME, enqueue_generation
-from server.services.storage import StorageError, StorageService, get_storage, output_key
+from server.services.storage import StorageError, StorageService, get_storage, output_key, sanitize_filename
 from server.worker import lifecycle
 from server.worker.celery_app import celery_app
 
@@ -122,8 +123,41 @@ def _execute(
         return "skipped"
     log.info("generation_starting", pipeline=gen.pipeline, **prompt_fingerprint(gen.prompt))
 
+    is_edit = gen.kind in edits.EDIT_KINDS
+    meta0 = gen.meta or {}
+    instruction = edits.effective_instruction(session, gen) if is_edit else gen.prompt
+    source_files: list[Path] = []
+    if is_edit:
+        try:
+            for i, asset in enumerate(edits.source_assets(session, gen)):
+                dest = project_dir / "assets" / "source" / f"{i:02d}_{sanitize_filename(asset.filename)}"
+                if not dest.is_file():
+                    storage.get_file(asset.storage_key, dest)
+                source_files.append(dest)
+            if not source_files:
+                return _fail(session, gid, ErrorCode.GENERATION_FAILED, "edit has no source footage")
+        except StorageError as exc:
+            if attempt < max_retries:
+                raise RetryableError("source download failed") from exc
+            return _fail(session, gid, ErrorCode.STORAGE_FAILED, f"source download failed: {exc!r}")
+
+    ctx = JobContext(
+        generation_id=str(gid), project_id=project_id, project_dir=project_dir, engine_dir=engine_dir,
+        pipeline=gen.pipeline, stages=stages, prompt=instruction, duration_seconds=gen.duration_seconds_requested,
+        aspect_ratio=gen.aspect_ratio, style=gen.style, voice_enabled=gen.voice_enabled,
+        captions_enabled=gen.captions_enabled, quality=gen.quality_profile,
+        budget_usd=settings.max_job_budget_usd, poll_interval_seconds=settings.cancel_poll_seconds,
+        kind=gen.kind, source_files=source_files, platform=gen.platform, cta_text=meta0.get("cta_text"),
+        variant_label=gen.variant_label, hook_text=meta0.get("hook_text"),
+        duration_explicit=bool(meta0.get("duration_explicit", True)),
+    )
+    # The chosen runtime may report a different stage vocabulary (e.g. the deterministic editor).
+    stages = runtime.plan_stages(ctx) or stages
+    ctx.stages = stages
     monitor = CheckpointMonitor(project_dir, stages)
     llm_cost = 0.0
+    warnings: list[str] = []
+    insights: dict = {}
 
     def poll() -> Abort | None:
         try:
@@ -148,15 +182,11 @@ def _execute(
             log.info("reusing_rendered_output")
         else:
             svc.mark_running(session, gid)
-            ctx = JobContext(
-                generation_id=str(gid), project_id=project_id, project_dir=project_dir, engine_dir=engine_dir,
-                pipeline=gen.pipeline, stages=stages, prompt=gen.prompt, duration_seconds=gen.duration_seconds_requested,
-                aspect_ratio=gen.aspect_ratio, style=gen.style, voice_enabled=gen.voice_enabled,
-                captions_enabled=gen.captions_enabled, quality=gen.quality_profile,
-                budget_usd=settings.max_job_budget_usd, poll=poll, poll_interval_seconds=settings.cancel_poll_seconds,
-            )
+            ctx.poll = poll
             result = runtime.run_generation(ctx)
             llm_cost = result.llm_cost_usd or 0.0
+            warnings = list(result.warnings)
+            insights = dict(result.insights)
             log.info("runtime_finished", status=result.status, turns=result.turns,
                      elapsed_ms=int((time.monotonic() - started) * 1000), detail=sanitize_text(result.detail, 400))
 
@@ -212,6 +242,7 @@ def _execute(
                     "width": probe.width, "height": probe.height,
                 },
                 "provider_cost_usd": provider_spend, "llm_cost_usd": round(llm_cost, 4),
+                "warnings": warnings, "insights": insights,
             },
         )
         est = _estimated_cost(project_dir)

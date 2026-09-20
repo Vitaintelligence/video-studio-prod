@@ -15,3 +15,5 @@ httpx==0.28.1
 structlog==26.1.0
 PyYAML>=6.0
 claude-agent-sdk==0.2.157
+# Speech-to-text for best-take selection (word timestamps). Model is pre-downloaded in the image.
+faster-whisper==1.2.1

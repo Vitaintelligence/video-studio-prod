@@ -32,6 +32,8 @@ License v3.0**. Its `LICENSE` and all upstream copyright notices are preserved u
 | httpx | BSD-3-Clause |
 | structlog | MIT / Apache-2.0 |
 | claude-agent-sdk (Anthropic) | Anthropic Commercial Terms of Service |
+| faster-whisper / CTranslate2 | MIT |
+| OpenAI Whisper model weights ("base") | MIT |
 | FFmpeg | LGPL/GPL depending on build (Debian's `ffmpeg` package is GPL-enabled) |
 | Node.js | MIT |
 | Chromium headless shell (downloaded by Remotion) | BSD-style and others |

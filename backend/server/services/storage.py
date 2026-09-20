@@ -74,6 +74,12 @@ class StorageService(ABC):
     def exists(self, key: str) -> bool: ...
 
     @abstractmethod
+    def size(self, key: str) -> int | None: ...
+
+    @abstractmethod
+    def get_file(self, key: str, dest: Path) -> None: ...
+
+    @abstractmethod
     def delete(self, key: str) -> None: ...
 
     def presign_upload(self, key: str, content_type: str, expires_in: int) -> PresignedUpload:
@@ -118,6 +124,17 @@ class LocalStorage(StorageService):
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
+
+    def size(self, key: str) -> int | None:
+        p = self._path(key)
+        return p.stat().st_size if p.is_file() else None
+
+    def get_file(self, key: str, dest: Path) -> None:
+        src = self._path(key)
+        if not src.is_file():
+            raise StorageError("object not found")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
@@ -175,6 +192,21 @@ class R2Storage(StorageService):
     def delete(self, key: str) -> None:
         validate_key(key)
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def size(self, key: str) -> int | None:
+        validate_key(key)
+        try:
+            return int(self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"])
+        except Exception:
+            return None
+
+    def get_file(self, key: str, dest: Path) -> None:
+        validate_key(key)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.client.download_file(self.bucket, key, str(dest))  # streams to disk, never into RAM
+        except Exception as exc:
+            raise StorageError("download failed") from exc
 
     def presign_upload(self, key: str, content_type: str, expires_in: int) -> PresignedUpload:
         validate_key(key)

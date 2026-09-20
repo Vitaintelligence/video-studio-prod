@@ -43,6 +43,10 @@ COPY requirements-server.txt /tmp/req/requirements-server.txt
 RUN pip install -r /tmp/req/openmontage-requirements.txt -r /tmp/req/requirements-server.txt \
     && (pip install piper-tts || echo "piper-tts unavailable: offline TTS disabled (cloud TTS still works)")
 
+# ---- Speech model for best-take selection: downloaded at BUILD time (no network needed at run time) ----
+ENV HF_HOME=/opt/hf     TRANSCRIBE_MODEL=base
+RUN python -c "import os; from faster_whisper import WhisperModel; WhisperModel(os.environ['TRANSCRIBE_MODEL'], device='cpu', compute_type='int8')"     && chmod -R a+rX /opt/hf
+
 # ---- Remotion (cached until the lockfile changes) ---------------------------------------
 WORKDIR /app/openmontage/remotion-composer
 COPY openmontage/remotion-composer/package.json openmontage/remotion-composer/package-lock.json ./

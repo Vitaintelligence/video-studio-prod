@@ -40,6 +40,10 @@ def fingerprint(req: GenerationCreate) -> str:
     return hashlib.sha256(json.dumps(req.model_dump(), sort_keys=True).encode()).hexdigest()
 
 
+def fingerprint_obj(obj: Any) -> str:
+    return hashlib.sha256(json.dumps(obj, sort_keys=True, default=str).encode()).hexdigest()
+
+
 def create_generation(
     session: Session,
     req: GenerationCreate,
@@ -124,7 +128,7 @@ def _decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
 def list_generations(
     session: Session, user_id: str, *, limit: int, cursor: str | None, status: str | None
 ) -> tuple[list[Generation], str | None]:
-    stmt = select(Generation).where(Generation.user_id == user_id)
+    stmt = select(Generation).where(Generation.user_id == user_id, Generation.kind == "generation")
     if status:
         stmt = stmt.where(Generation.status == status)
     if cursor:

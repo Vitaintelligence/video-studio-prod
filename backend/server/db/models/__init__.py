@@ -5,3 +5,4 @@ from server.db.models.generation import (  # noqa: F401
     GenerationStatus,
     utcnow,
 )
+from server.db.models.project import Asset, Project  # noqa: F401

@@ -35,7 +35,14 @@ def _write_checkpoint(project_dir: Path, project_id: str, pipeline: str, stage: 
     }
     tmp = project_dir / f"checkpoint_{stage}.json.tmp"
     tmp.write_text(json.dumps(cp), encoding="utf-8")
-    os.replace(tmp, project_dir / f"checkpoint_{stage}.json")
+    for attempt in range(20):  # Windows: replace fails while the progress monitor has the file open
+        try:
+            os.replace(tmp, project_dir / f"checkpoint_{stage}.json")
+            return
+        except PermissionError:
+            if attempt == 19:
+                raise
+            time.sleep(0.05)
 
 
 class MockRuntime(RuntimeOrchestrator):

@@ -1,0 +1,490 @@
+{
+ "segments": [
+  {
+   "id": 1,
+   "start": 0.62,
+   "end": 3.14,
+   "text": "so i have been using the serum for 2 weeks"
+  },
+  {
+   "id": 2,
+   "start": 5.41,
+   "end": 7.53,
+   "text": "ok wait, let me start again"
+  },
+  {
+   "id": 3,
+   "start": 9.76,
+   "end": 13.2,
+   "text": "so i have been using this, um, this serum for 2"
+  },
+  {
+   "id": 4,
+   "start": 15.84,
+   "end": 19.8,
+   "text": "so i have been using this serum for 2 weeks and my skin looks amazing"
+  },
+  {
+   "id": 5,
+   "start": 19.8,
+   "end": 25.21,
+   "text": "so i have been using the serum for 2 weeks and my skin looks amazing"
+  },
+  {
+   "id": 6,
+   "start": 26.84,
+   "end": 30.52,
+   "text": "use code glow for twin, 20% off"
+  },
+  {
+   "id": 7,
+   "start": 31.86,
+   "end": 35.12,
+   "text": "use code glow for 20% off today"
+  }
+ ],
+ "word_timestamps": [
+  {
+   "word": " so",
+   "start": 0.62,
+   "end": 1.08,
+   "probability": 0.21
+  },
+  {
+   "word": " i",
+   "start": 1.08,
+   "end": 1.24,
+   "probability": 0.33
+  },
+  {
+   "word": " have",
+   "start": 1.24,
+   "end": 1.38,
+   "probability": 0.994
+  },
+  {
+   "word": " been",
+   "start": 1.38,
+   "end": 1.54,
+   "probability": 0.996
+  },
+  {
+   "word": " using",
+   "start": 1.54,
+   "end": 1.78,
+   "probability": 0.998
+  },
+  {
+   "word": " the",
+   "start": 1.78,
+   "end": 2.02,
+   "probability": 0.354
+  },
+  {
+   "word": " serum",
+   "start": 2.02,
+   "end": 2.28,
+   "probability": 0.987
+  },
+  {
+   "word": " for",
+   "start": 2.28,
+   "end": 2.54,
+   "probability": 0.998
+  },
+  {
+   "word": " 2",
+   "start": 2.54,
+   "end": 2.78,
+   "probability": 0.317
+  },
+  {
+   "word": " weeks",
+   "start": 2.78,
+   "end": 3.14,
+   "probability": 0.989
+  },
+  {
+   "word": " ok",
+   "start": 5.41,
+   "end": 5.93,
+   "probability": 0.236
+  },
+  {
+   "word": " wait,",
+   "start": 5.93,
+   "end": 6.33,
+   "probability": 0.897
+  },
+  {
+   "word": " let",
+   "start": 6.61,
+   "end": 6.85,
+   "probability": 0.941
+  },
+  {
+   "word": " me",
+   "start": 6.85,
+   "end": 6.97,
+   "probability": 0.995
+  },
+  {
+   "word": " start",
+   "start": 6.97,
+   "end": 7.19,
+   "probability": 0.996
+  },
+  {
+   "word": " again",
+   "start": 7.19,
+   "end": 7.53,
+   "probability": 0.995
+  },
+  {
+   "word": " so",
+   "start": 9.76,
+   "end": 10.02,
+   "probability": 0.768
+  },
+  {
+   "word": " i",
+   "start": 10.02,
+   "end": 10.18,
+   "probability": 0.951
+  },
+  {
+   "word": " have",
+   "start": 10.18,
+   "end": 10.32,
+   "probability": 0.993
+  },
+  {
+   "word": " been",
+   "start": 10.32,
+   "end": 10.46,
+   "probability": 0.996
+  },
+  {
+   "word": " using",
+   "start": 10.46,
+   "end": 10.7,
+   "probability": 0.997
+  },
+  {
+   "word": " this,",
+   "start": 10.7,
+   "end": 11.2,
+   "probability": 0.993
+  },
+  {
+   "word": " um,",
+   "start": 11.42,
+   "end": 11.74,
+   "probability": 0.881
+  },
+  {
+   "word": " this",
+   "start": 12.14,
+   "end": 12.36,
+   "probability": 0.886
+  },
+  {
+   "word": " serum",
+   "start": 12.36,
+   "end": 12.66,
+   "probability": 0.996
+  },
+  {
+   "word": " for",
+   "start": 12.66,
+   "end": 12.9,
+   "probability": 0.996
+  },
+  {
+   "word": " 2",
+   "start": 12.9,
+   "end": 13.2,
+   "probability": 0.886
+  },
+  {
+   "word": " so",
+   "start": 15.84,
+   "end": 16.2,
+   "probability": 0.762
+  },
+  {
+   "word": " i",
+   "start": 16.2,
+   "end": 16.4,
+   "probability": 0.973
+  },
+  {
+   "word": " have",
+   "start": 16.4,
+   "end": 16.54,
+   "probability": 0.996
+  },
+  {
+   "word": " been",
+   "start": 16.54,
+   "end": 16.7,
+   "probability": 0.997
+  },
+  {
+   "word": " using",
+   "start": 16.7,
+   "end": 16.94,
+   "probability": 0.997
+  },
+  {
+   "word": " this",
+   "start": 16.94,
+   "end": 17.22,
+   "probability": 0.97
+  },
+  {
+   "word": " serum",
+   "start": 17.22,
+   "end": 17.52,
+   "probability": 0.998
+  },
+  {
+   "word": " for",
+   "start": 17.52,
+   "end": 17.78,
+   "probability": 0.997
+  },
+  {
+   "word": " 2",
+   "start": 17.78,
+   "end": 18.04,
+   "probability": 0.956
+  },
+  {
+   "word": " weeks",
+   "start": 18.04,
+   "end": 18.3,
+   "probability": 0.996
+  },
+  {
+   "word": " and",
+   "start": 18.3,
+   "end": 18.52,
+   "probability": 0.974
+  },
+  {
+   "word": " my",
+   "start": 18.52,
+   "end": 18.7,
+   "probability": 0.992
+  },
+  {
+   "word": " skin",
+   "start": 18.7,
+   "end": 18.98,
+   "probability": 0.999
+  },
+  {
+   "word": " looks",
+   "start": 18.98,
+   "end": 19.26,
+   "probability": 0.981
+  },
+  {
+   "word": " amazing",
+   "start": 19.26,
+   "end": 19.8,
+   "probability": 0.971
+  },
+  {
+   "word": " so",
+   "start": 19.8,
+   "end": 20.8,
+   "probability": 0.92
+  },
+  {
+   "word": " i",
+   "start": 22.53,
+   "end": 22.69,
+   "probability": 0.989
+  },
+  {
+   "word": " have",
+   "start": 22.69,
+   "end": 22.77,
+   "probability": 0.994
+  },
+  {
+   "word": " been",
+   "start": 22.77,
+   "end": 22.91,
+   "probability": 0.996
+  },
+  {
+   "word": " using",
+   "start": 22.91,
+   "end": 23.07,
+   "probability": 0.997
+  },
+  {
+   "word": " the",
+   "start": 23.07,
+   "end": 23.27,
+   "probability": 0.433
+  },
+  {
+   "word": " serum",
+   "start": 23.27,
+   "end": 23.47,
+   "probability": 0.997
+  },
+  {
+   "word": " for",
+   "start": 23.47,
+   "end": 23.67,
+   "probability": 0.997
+  },
+  {
+   "word": " 2",
+   "start": 23.67,
+   "end": 23.85,
+   "probability": 0.976
+  },
+  {
+   "word": " weeks",
+   "start": 23.85,
+   "end": 24.05,
+   "probability": 0.997
+  },
+  {
+   "word": " and",
+   "start": 24.05,
+   "end": 24.19,
+   "probability": 0.991
+  },
+  {
+   "word": " my",
+   "start": 24.19,
+   "end": 24.33,
+   "probability": 0.997
+  },
+  {
+   "word": " skin",
+   "start": 24.33,
+   "end": 24.53,
+   "probability": 0.999
+  },
+  {
+   "word": " looks",
+   "start": 24.53,
+   "end": 24.75,
+   "probability": 0.987
+  },
+  {
+   "word": " amazing",
+   "start": 24.75,
+   "end": 25.21,
+   "probability": 0.992
+  },
+  {
+   "word": " use",
+   "start": 26.84,
+   "end": 27.84,
+   "probability": 0.826
+  },
+  {
+   "word": " code",
+   "start": 27.84,
+   "end": 28.12,
+   "probability": 0.832
+  },
+  {
+   "word": " glow",
+   "start": 28.12,
+   "end": 28.36,
+   "probability": 0.901
+  },
+  {
+   "word": " for",
+   "start": 28.36,
+   "end": 28.62,
+   "probability": 0.983
+  },
+  {
+   "word": " twin,",
+   "start": 28.62,
+   "end": 28.92,
+   "probability": 0.363
+  },
+  {
+   "word": " 20",
+   "start": 29.24,
+   "end": 29.76,
+   "probability": 0.945
+  },
+  {
+   "word": "%",
+   "start": 29.76,
+   "end": 30.08,
+   "probability": 0.909
+  },
+  {
+   "word": " off",
+   "start": 30.08,
+   "end": 30.52,
+   "probability": 0.985
+  },
+  {
+   "word": " use",
+   "start": 31.86,
+   "end": 32.88,
+   "probability": 0.823
+  },
+  {
+   "word": " code",
+   "start": 32.88,
+   "end": 33.22,
+   "probability": 0.991
+  },
+  {
+   "word": " glow",
+   "start": 33.22,
+   "end": 33.48,
+   "probability": 0.995
+  },
+  {
+   "word": " for",
+   "start": 33.48,
+   "end": 33.74,
+   "probability": 0.999
+  },
+  {
+   "word": " 20",
+   "start": 33.74,
+   "end": 34.1,
+   "probability": 0.986
+  },
+  {
+   "word": "%",
+   "start": 34.1,
+   "end": 34.48,
+   "probability": 0.992
+  },
+  {
+   "word": " off",
+   "start": 34.48,
+   "end": 34.78,
+   "probability": 0.994
+  },
+  {
+   "word": " today",
+   "start": 34.78,
+   "end": 35.12,
+   "probability": 0.978
+  }
+ ],
+ "language": "en",
+ "duration_seconds": 37.338,
+ "model_size": "base",
+ "device": "cpu"
+}

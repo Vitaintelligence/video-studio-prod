@@ -23,6 +23,12 @@ Everything else under `backend/openmontage/` is byte-for-byte upstream.
    are off. Schema validation, self-review, checkpoints, cost governance and render verification are kept.
    The upstream contract suite (`tests/contracts/test_pipeline_catalog.py`) validates this manifest.
 
+2. **Added** best-take selection (all new files, no upstream file modified):
+   - `openmontage/lib/take_selection.py` - stdlib-only engine: word-level transcript -> utterances -> repeated-take groups
+     -> scores -> edit decision list (dead air, fillers, off-script talk removed)
+   - `openmontage/tools/analysis/take_analyzer.py` - registry tool `take_analyzer` (`analyze`, `edl`)
+   - `openmontage/.agents/skills/take-selection/SKILL.md` - Layer 3 skill so agents know how to use it
+
 No other file was changed. When updating the engine, re-import upstream over `backend/openmontage/`,
 re-apply item 1, update the SHA above, and run `make test-contracts` inside `backend/openmontage/`.
 

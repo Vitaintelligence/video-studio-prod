@@ -78,7 +78,9 @@ def test_no_unrestricted_agent_endpoints(client):
         assert not any(word in path.lower() for word in forbidden), path
     assert set(schema["paths"]) == {
         "/health", "/ready", "/v1/capabilities", "/v1/generations", "/v1/generations/{generation_id}",
-        "/v1/generations/{generation_id}/cancel", "/v1/uploads/presign",
+        "/v1/generations/{generation_id}/cancel", "/v1/uploads/presign", "/v1/uploads/{asset_id}/complete",
+        "/v1/projects", "/v1/projects/{project_id}", "/v1/edits", "/v1/edits/{edit_id}", "/v1/edits/{edit_id}/cancel",
+        "/v1/edits/{edit_id}/instructions", "/v1/edits/{edit_id}/variants",
     }
 
 
@@ -299,8 +301,28 @@ def test_capabilities_unknown_then_published(client, fake_redis, env):
 
 # -- uploads -----------------------------------------------------------------
 
-def test_uploads_unavailable_with_local_storage(client):
+def test_uploads_local_dev_returns_signed_put_to_api(client):
     r = client.post("/v1/uploads/presign", json={"filename": "a.mov", "content_type": "video/quicktime", "purpose": "reference"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["method"] == "PUT" and "/v1/uploads/" in body["url"] and "sig=" in body["url"] and body["asset_id"]
+
+
+def test_uploads_unavailable_with_local_storage_in_production(env, monkeypatch, fake_redis):
+    from fastapi.testclient import TestClient
+
+    from server.api.main import create_app
+    from server.core.config import Settings
+    from server.services.ratelimit import RateLimiter
+    from tests.conftest import TEST_TOKEN
+
+    monkeypatch.setenv("APP_ENV", "production")
+    app = create_app(Settings(_env_file=None))
+    limiter = RateLimiter(fake_redis)
+    app.state.get_redis = lambda: fake_redis
+    app.state.get_rate_limiter = lambda: limiter
+    with TestClient(app, headers={"Authorization": f"Bearer {TEST_TOKEN}"}) as c:
+        r = c.post("/v1/uploads/presign", json={"filename": "a.mov", "content_type": "video/quicktime", "purpose": "reference"})
     assert r.status_code == 501 and r.json()["error"]["code"] == "UPLOADS_UNAVAILABLE"
 
 

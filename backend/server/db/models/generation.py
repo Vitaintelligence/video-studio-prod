@@ -72,6 +72,15 @@ class Generation(Base):
         DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
     )
 
+    # --- edit product fields (an "edit" is a generation row; see services/edit_service.py) ---
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="generation", server_default="generation")  # generation|edit|revision|variant
+    project_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)  # revision/variant -> root edit
+    revision_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    platform: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    variant_strategy: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    variant_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
     # Column is called "metadata" but that name is reserved on declarative classes.
     meta: Mapped[dict[str, Any]] = mapped_column("metadata", JSONType, nullable=False, default=dict)
 
@@ -79,4 +88,6 @@ class Generation(Base):
         Index("ix_generations_user_created", "user_id", "created_at"),
         Index("ix_generations_status_created", "status", "created_at"),
         Index("ix_generations_created_at", "created_at"),
+        Index("ix_generations_project", "project_id", "created_at"),
+        Index("ix_generations_parent", "parent_id", "created_at"),
     )

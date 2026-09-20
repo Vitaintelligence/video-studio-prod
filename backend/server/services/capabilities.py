@@ -75,9 +75,21 @@ def normalize(raw: dict[str, Any], settings: Settings) -> dict[str, Any]:
     visuals = features["text_to_video"] or features["image_generation"]
     agent_ok = settings.orchestrator_provider == "mock" or bool(settings.anthropic_api_key)
     available = bool(raw.get("registry_ok")) and composition_ok and visuals and bool(pipelines_enabled) and agent_ok
+    # Product capabilities. Deterministic editing needs only FFmpeg: it works with no provider keys at all.
+    editing = composition_ok and bool(pipelines_enabled)
+    has_video_model = bool(settings.openrouter_video_model or settings.openrouter_video_profiles)
+    video_generation = bool(settings.openrouter_api_key) and has_video_model
+    ai_broll = editing and settings.enable_generative_broll and video_generation
     return {
         "status": "ok" if raw.get("registry_ok") else "degraded",
         "generation_available": available,
+        "editing": editing,
+        "ai_broll": ai_broll,
+        "video_generation": video_generation,
+        "variants": editing,
+        "revisions": editing,
+        "best_takes": editing and bool(raw.get("whisper")),  # transcription available on the worker
+        "takes_llm": bool(settings.openrouter_api_key and settings.openrouter_editing_model and settings.takes_llm_enabled),
         "pipelines": [{"id": pid, "enabled": pid in pipelines_enabled and available} for pid in pipelines_enabled],
         "features": features,
         "generated_at": int(time.time()),
@@ -116,13 +128,20 @@ def capabilities_document(redis_client, settings: Settings | None = None) -> dic
         "aspect_ratios": ["9:16", "1:1", "16:9"],
         "quality": ["standard", "cinematic"],
         "max_prompt_chars": 2000,
-        "uploads": settings.storage_backend == "r2",
+        "uploads": settings.storage_backend == "r2" or not settings.is_production,
     }
     if snap is None:
         # No worker has reported yet (or the snapshot expired): say so honestly.
         return {
             "status": "unknown",
             "generation_available": False,
+            "editing": False,
+            "ai_broll": False,
+            "video_generation": False,
+            "variants": False,
+            "revisions": False,
+            "best_takes": False,
+            "takes_llm": False,
             "pipelines": [{"id": pid, "enabled": False} for pid in enabled_pipelines()],
             "features": {k: False for k in ("text_to_video", "image_generation", "tts", "captions", "music", "stock_video")},
             "limits": base_limits,

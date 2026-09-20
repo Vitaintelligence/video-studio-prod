@@ -1,0 +1,47 @@
+{
+  "duration": 37.31,
+  "utterances": [
+    {
+      "label": "serum_a",
+      "text": "So I have been using this serum for two weeks.",
+      "start": 0.8,
+      "end": 4.06
+    },
+    {
+      "label": "chatter1",
+      "text": "Okay wait, let me start again.",
+      "start": 5.66,
+      "end": 8.32
+    },
+    {
+      "label": "serum_b_flub",
+      "text": "So I have been using this, um, this serum for two.",
+      "start": 9.72,
+      "end": 14.0
+    },
+    {
+      "label": "serum_c_best",
+      "text": "So I have been using this serum for two weeks and my skin looks amazing.",
+      "start": 15.9,
+      "end": 20.82
+    },
+    {
+      "label": "serum_d_repeat",
+      "text": "So I have been using this serum for two weeks and my skin looks amazing.",
+      "start": 22.32,
+      "end": 25.84
+    },
+    {
+      "label": "code_a_stumble",
+      "text": "Use code glow for twen, twenty percent off.",
+      "start": 27.54,
+      "end": 31.3
+    },
+    {
+      "label": "code_b_clean",
+      "text": "Use code glow for twenty percent off today.",
+      "start": 32.6,
+      "end": 36.11
+    }
+  ]
+}

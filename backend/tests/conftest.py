@@ -101,3 +101,42 @@ VALID_BODY = {
 @pytest.fixture()
 def valid_body():
     return dict(VALID_BODY)
+
+
+FIXTURE_VIDEO = Path(__file__).parent / "fixtures" / "test_ugc.mp4"
+
+
+@pytest.fixture()
+def real_engine(env, monkeypatch):
+    """Point the worker at the real OpenMontage engine dir (needed by the deterministic editor).
+    Job workspaces created by the test are removed afterwards."""
+    from server.core import config
+
+    real = BACKEND / "openmontage"
+    monkeypatch.setenv("OPENMONTAGE_DIR", str(real))
+    monkeypatch.setenv("ORCHESTRATOR_PROVIDER", "local_edit")
+    config.reset_settings_cache()
+    before = set((real / "projects").glob("*")) if (real / "projects").exists() else set()
+    yield {**env, "engine": real, "settings": config.get_settings()}
+    for d in set((real / "projects").glob("*")) - before:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+@pytest.fixture()
+def upload_asset(client):
+    """Upload a local file through the real presign -> PUT -> complete flow; returns the asset json."""
+
+    def _upload(path: Path = FIXTURE_VIDEO, content_type: str = "video/mp4", project_id: str | None = None) -> dict:
+        body = {"filename": path.name, "content_type": content_type, "purpose": "source_video", "size_bytes": path.stat().st_size}
+        if project_id:
+            body["project_id"] = project_id
+        pre = client.post("/v1/uploads/presign", json=body)
+        assert pre.status_code == 200, pre.text
+        p = pre.json()
+        put = client.put(p["url"], content=path.read_bytes(), headers={**p["headers"], "Authorization": ""})
+        assert put.status_code == 200, put.text
+        done = client.post(f"/v1/uploads/{p['asset_id']}/complete")
+        assert done.status_code == 200, done.text
+        return done.json()
+
+    return _upload

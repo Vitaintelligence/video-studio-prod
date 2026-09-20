@@ -17,6 +17,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
+def normalize_database_url(url: str) -> str:
+    """Railway / Heroku style URLs use the bare `postgres(ql)://` scheme; SQLAlchemy needs the psycopg (v3) driver spelled out."""
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -41,7 +50,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # --- orchestration -----------------------------------------------------
-    orchestrator_provider: Literal["claude_agent_sdk", "mock"] = "claude_agent_sdk"
+    orchestrator_provider: Literal["claude_agent_sdk", "local_edit", "mock"] = "claude_agent_sdk"
     anthropic_api_key: SecretStr | None = None
     openmontage_dir: Path = BACKEND_DIR / "openmontage"
     openmontage_pipeline: str = "app-cinematic"
@@ -80,8 +89,35 @@ class Settings(BaseSettings):
     max_upload_bytes_image: int = 20 * 1024 * 1024
     presign_ttl_seconds: int = 900
 
+    # --- OpenRouter (backend/worker only; NEVER shipped to a client) ------------
+    openrouter_api_key: SecretStr | None = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_reasoning_model: str | None = None
+    openrouter_vision_model: str | None = None
+    openrouter_image_model: str | None = None
+    openrouter_video_model: str | None = None
+    # Editorial decisions (best-take selection). Any OpenRouter text model, e.g. a Qwen 3.x model id.
+    openrouter_editing_model: str | None = None
+    # Internal quality profiles -> model ids, e.g. {"ugc_broll": "vendor/model", "fast": "..."}.
+    openrouter_video_profiles: dict[str, str] = Field(default_factory=dict)
+    openrouter_timeout_seconds: float = 60.0
+    video_poll_interval_seconds: float = 5.0
+    video_poll_timeout_seconds: float = 900.0
+
+    # --- editing product ---------------------------------------------------------
+    local_edit_first: bool = True  # deterministic FFmpeg/OpenMontage edits before any LLM or generation
+    enable_generative_broll: bool = False  # paid; off unless explicitly enabled
+    max_broll_clips_per_edit: int = 2
+    max_variants_per_request: int = 5
+    max_variants_per_edit: int = 10
+    max_assets_per_edit: int = 10
+    transcribe_model: str = "base"  # faster-whisper size; pre-downloaded in the Docker image
+    transcribe_language: str | None = None  # None = auto-detect
+    takes_llm_enabled: bool = True  # let the editing model choose among the engine's candidate takes
+
     # --- smoke tests -------------------------------------------------------
     allow_paid_smoke_test: bool = False
+    allow_paid_e2e: bool = False
 
     @field_validator("cors_allowed_origins", mode="before")
     @classmethod
@@ -93,13 +129,7 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _normalize_db_url(cls, v: str) -> str:
-        # Railway / Heroku style URLs use the bare `postgres(ql)://` scheme;
-        # SQLAlchemy needs the psycopg (v3) driver spelled out.
-        if v.startswith("postgres://"):
-            v = "postgresql://" + v[len("postgres://"):]
-        if v.startswith("postgresql://"):
-            v = "postgresql+psycopg://" + v[len("postgresql://"):]
-        return v
+        return normalize_database_url(v)
 
     @model_validator(mode="after")
     def _validate(self) -> "Settings":

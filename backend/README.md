@@ -104,6 +104,39 @@ changes; `tests/test_platform.py` fails if models and migrations drift.
   Anthropic-key-injecting local proxy (agent gets a dummy key) and provider-call proxies.
   A real production auth system and per-user quotas are Phase 2+.
 
+
+## Best-take selection ("say it five times, post the best one")
+
+For talking-head / UGC footage the worker can turn a messy recording into a clean cut. It triggers when the edit
+instruction mentions retakes, mistakes, messy footage, filler words, "best take", etc. (see `server/services/edit_planner.py`).
+
+```
+video -> speech-to-text with word timestamps (faster-whisper, local)
+      -> utterances -> groups of repeated takes (the same line said again, incl. half-said flubs)
+      -> off-script chatter flagged ("wait, let me start again")
+      -> per-take scores: completeness, fluency (fillers, stumbles, pauses), ASR confidence, pacing
+      -> [OpenRouter / Qwen] editorial choice among the candidate takes   (optional; falls back to the scores)
+      -> keep-ranges on word boundaries; dead air, fillers, retakes removed; audio fades at joins
+      -> OpenMontage video_trimmer cut + concat -> FFmpeg render
+```
+
+- The engine and tool live inside OpenMontage: `openmontage/lib/take_selection.py`, tool `take_analyzer`
+  (`analyze` / `edl`), skill `.agents/skills/take-selection/SKILL.md` - so the Claude agent path can use the same
+  measurements. They are listed as local modifications in `OPENMONTAGE_UPSTREAM.md`.
+- **The model cannot invent cuts.** It sees only text (ids, times, transcript, scores) and answers with choices among
+  ids the engine produced; the engine validates them and ignores anything else. Transcript text is treated as untrusted data.
+- Configure the model with `OPENROUTER_EDITING_MODEL` (any OpenRouter text model, e.g. a Qwen 3.7 id such as
+  `qwen/qwen3.7-flash`). Without it, or if the call fails, the engine's own recommendation is used
+  (the response then carries the `takes_llm_unavailable` warning when a model was configured but unusable).
+- Speech-to-text runs on the worker's CPU (`TRANSCRIBE_MODEL`, default `base`; ~4x real time). The model is baked into the image.
+- The edit response includes safe `insights` (e.g. `retakes_removed`, `off_script_removed`, `source_seconds`,
+  `output_seconds`) and warnings (`no_speech_detected`, `take_analysis_failed`, `takes_unavailable`).
+- A target length only ever drops whole segments; a sentence is never cut in half.
+- Verified end to end on real speech: a 37 s clip with 4 retakes, an off-script remark, filler words and long pauses becomes ~8 s
+  containing only the best take of each line (checked by re-transcribing the output).
+- Limits: v1 assumes one speaker; it judges from the transcript and audio, not from what is on screen (no visual take
+  scoring yet); non-English quality depends on the Whisper model size.
+
 ## Deploying to Railway
 
 Topology: `Postgres` + `Redis` (private) + `api` (public domain, health check `/health`) + `worker` (no domain).

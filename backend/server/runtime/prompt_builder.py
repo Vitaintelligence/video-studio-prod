@@ -37,7 +37,9 @@ for every stage with lib.checkpoint.write_checkpoint (in_progress on entry, \
 completed with the canonical artifact when done). During assets/compose refresh \
 metadata.partial_progress after each finished unit.
 6. Composition mode is TEMPLATED only: assemble the stock Remotion scene types / FFmpeg path. Do NOT use atelier/bespoke authoring, HyperFrames workspaces or anything that requires writing code outside your project directory.
-7. Self-review each stage with skills/meta/reviewer.md (max two rounds), then continue.
+7. For talking-head / UGC footage with retakes, dead air or filler words, use the `take_analyzer` tool (read
+.agents/skills/take-selection/SKILL.md first): it finds repeated takes and returns keep-ranges; cut them with video_trimmer.
+8. Self-review each stage with skills/meta/reviewer.md (max two rounds), then continue.
 
 AUTONOMOUS MODE (overrides any director skill that says to ask, present options, \
 wait, or END YOUR TURN)

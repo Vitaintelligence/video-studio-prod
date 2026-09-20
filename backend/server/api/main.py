@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from server.api.routes import capabilities, generations, health, uploads
+from server.api.routes import capabilities, edits, generations, health, projects, uploads
 from server.core.config import Settings, get_settings
 from server.core.errors import ErrorCode, error_body, install_error_handlers
 from server.core.logging import configure_logging
@@ -69,7 +69,9 @@ class RequestContextMiddleware:
 
         try:
             method = scope["method"]
-            if method in ("POST", "PUT", "PATCH"):
+            path = scope["path"]
+            is_upload = path.startswith("/v1/uploads/") and path.endswith("/content")  # streamed by its own handler
+            if method in ("POST", "PUT", "PATCH") and not is_upload:
                 declared = headers.get(b"content-length")
                 if declared is not None and declared.isdigit() and int(declared) > self.max_body_bytes:
                     await reject(413, ErrorCode.PAYLOAD_TOO_LARGE, "Request body too large.")
@@ -149,6 +151,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(capabilities.router)
     app.include_router(generations.router)
     app.include_router(uploads.router)
+    app.include_router(projects.router)
+    app.include_router(edits.router)
 
     if settings.storage_backend == "local" and not settings.is_production:
         _mount_dev_media(app)

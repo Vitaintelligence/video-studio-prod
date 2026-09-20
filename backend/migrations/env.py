@@ -3,7 +3,9 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
-from server.core.config import get_settings
+import os
+
+from server.core.config import normalize_database_url
 from server.db.base import Base
 from server.db import models  # noqa: F401  (register tables)
 
@@ -15,7 +17,10 @@ target_metadata = Base.metadata
 
 
 def _url() -> str:
-    return config.get_main_option("sqlalchemy.url") or get_settings().database_url
+    # Migrations need ONLY the database URL. They must not construct the full app Settings, whose validation
+    # (storage credentials, API token, ...) is irrelevant here and would block a deploy for unrelated reasons.
+    url = config.get_main_option("sqlalchemy.url") or os.environ.get("DATABASE_URL") or "sqlite+pysqlite:///./dev.db"
+    return normalize_database_url(url)
 
 
 def run_migrations_offline() -> None:

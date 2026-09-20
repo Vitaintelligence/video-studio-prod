@@ -46,10 +46,36 @@ DISPLAY_STAGES: dict[str, str] = {
 DEFAULT_DISPLAY_STAGE = "Working on your video"
 
 
-def display_stage(stage: str | None) -> str | None:
+# Edit jobs (footage in, video out) use their own consumer wording. Covers both the deterministic
+# editor's stages and the agent pipeline's stage names.
+EDIT_DISPLAY_STAGES: dict[str, str] = {
+    "queued": "Waiting in line",
+    "starting": "Getting ready",
+    "ingest": "Understanding footage",
+    "research": "Understanding footage",
+    "analyze": "Finding strongest moments",
+    "proposal": "Finding strongest moments",
+    "script": "Finding strongest moments",
+    "plan": "Building your edit",
+    "scene_plan": "Building your edit",
+    "broll": "Adding B-roll",
+    "assets": "Adding B-roll",
+    "edit": "Building your edit",
+    "captions": "Adding captions",
+    "render": "Finalizing",
+    "compose": "Finalizing",
+    "finalizing": "Finalizing",
+    "uploading": "Finalizing",
+    "complete": "Ready",
+}
+EDIT_KINDS = ("edit", "revision", "variant")
+
+
+def display_stage(stage: str | None, kind: str = "generation") -> str | None:
     if stage is None:
         return None
-    return DISPLAY_STAGES.get(stage, DEFAULT_DISPLAY_STAGE)
+    table = EDIT_DISPLAY_STAGES if kind in EDIT_KINDS else DISPLAY_STAGES
+    return table.get(stage, DEFAULT_DISPLAY_STAGE)
 
 
 def get_pipeline(pipeline_id: str) -> PipelineInfo | None:
