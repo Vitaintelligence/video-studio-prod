@@ -53,7 +53,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
     final session = ref.read(cameraSessionProvider.notifier);
     final state = ref.read(cameraSessionProvider);
     HapticFeedback.mediumImpact();
-    if (state.isRecording) {
+    if (state.isCountingDown) {
+      session.cancelCountdown();
+    } else if (state.isRecording) {
       final started = await session.stopAndClean();
       if (started && mounted) context.pushReplacement(Routes.upload);
     } else {
@@ -87,7 +89,7 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
           ),
           _ => Column(
             children: [
-              _TopBar(state: state, onClose: () => context.pop(), onTorch: session.toggleTorch),
+              _TopBar(state: state, onClose: () => context.pop(), onRetake: session.retake, onTorch: session.toggleTorch),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
@@ -97,7 +99,18 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
                       color: AppColors.surface,
                       child: (state.phase == CameraPhase.opening || state.phase == CameraPhase.saving)
                           ? const LoadingView()
-                          : Center(child: _Preview()),
+                          : Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Center(child: _Preview()),
+                                if (state.isCountingDown)
+                                  Semantics(
+                                    liveRegion: true,
+                                    label: 'Recording starts in ${state.countdown}',
+                                    child: Text('${state.countdown}', style: AppTypography.display.copyWith(fontSize: 96)),
+                                  ),
+                              ],
+                            ),
                     ),
                   ),
                 ),
@@ -120,10 +133,11 @@ class _Preview extends ConsumerWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.state, required this.onClose, required this.onTorch});
+  const _TopBar({required this.state, required this.onClose, required this.onRetake, required this.onTorch});
 
   final CameraState state;
   final VoidCallback onClose;
+  final VoidCallback onRetake;
   final VoidCallback onTorch;
 
   @override
@@ -134,18 +148,20 @@ class _TopBar extends StatelessWidget {
       height: 56,
       child: Row(
         children: [
-          AppIconButton(
-            icon: CupertinoIcons.xmark,
-            label: 'Close camera',
-            onPressed: state.isRecording ? null : onClose,
-          ),
+          state.isRecording
+              ? AppIconButton(icon: CupertinoIcons.arrow_counterclockwise, label: 'Discard and retake', onPressed: onRetake)
+              : AppIconButton(
+                  icon: CupertinoIcons.xmark,
+                  label: 'Close camera',
+                  onPressed: state.phase == CameraPhase.saving ? null : onClose,
+                ),
           Expanded(
             child: Center(
               child: Semantics(
                 liveRegion: false,
                 label: 'Recording time $time',
                 child: Text(
-                  state.isRecording || state.phase == CameraPhase.saving ? time : 'Ready',
+                  state.isRecording || state.phase == CameraPhase.saving ? time : (state.isCountingDown ? 'Get ready' : 'Ready'),
                   style: AppTypography.heading.copyWith(
                     color: state.isRecording ? AppColors.destructive : AppColors.textPrimary,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -176,7 +192,7 @@ class _Controls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = state.canRecord || state.isRecording;
+    final enabled = state.canRecord || state.isRecording || state.isCountingDown;
     return SizedBox(
       height: 112,
       child: Row(
@@ -185,7 +201,7 @@ class _Controls extends StatelessWidget {
           Semantics(
             button: true,
             enabled: enabled,
-            label: state.isRecording ? 'Stop recording' : 'Start recording',
+            label: state.isRecording ? 'Stop recording' : (state.isCountingDown ? 'Cancel countdown' : 'Start recording'),
             excludeSemantics: true,
             onTap: enabled ? onRecord : null,
             child: GestureDetector(

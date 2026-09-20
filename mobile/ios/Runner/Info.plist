@@ -51,5 +51,7 @@
 	<string>AdCut records your voice with the video so it can remove pauses.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AdCut needs access to your videos so you can pick one to clean up.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>AdCut saves your finished cut to Photos when you ask it to.</string>
 </dict>
 </plist>

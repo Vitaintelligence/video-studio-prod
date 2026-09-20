@@ -2,20 +2,22 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/design/app_colors.dart';
+import 'active_work_bar.dart';
 import 'routes.dart';
 
 /// Root scaffold: Home, a dominant Camera action in the center, and Projects.
 /// Features a centralized, floating pill navigation dock with glassmorphism and energetic cyan accents.
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
 
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       extendBody: true,
@@ -23,16 +25,19 @@ class AppShell extends StatelessWidget {
       body: shell,
       bottomNavigationBar: keyboardOpen
           ? null
-          : SafeArea(
-              top: false,
-              maintainBottomViewPadding: true,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Center(
-                  heightFactor: 1.0,
-                  child: _NavPill(shell: shell),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const ActiveWorkBar(),
+                SafeArea(
+                  top: false,
+                  maintainBottomViewPadding: true,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Center(heightFactor: 1.0, child: _NavPill(shell: shell)),
+                  ),
                 ),
-              ),
+              ],
             ),
     );
   }

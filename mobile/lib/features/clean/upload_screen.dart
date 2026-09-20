@@ -11,6 +11,7 @@ import '../../core/widgets/app_progress_bar.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/screen_header.dart';
 import '../../core/widgets/state_views.dart';
+import '../projects/projects_controller.dart';
 import 'clean_controller.dart';
 
 /// Shown right after a recording/pick: real upload progress, then straight into the job.
@@ -25,6 +26,7 @@ class UploadScreen extends ConsumerWidget {
     ref.listen(cleanControllerProvider.select((s) => s.editId), (_, id) {
       if (id != null) {
         controller.reset();
+        ref.invalidate(projectsProvider);
         context.pushReplacement(Routes.edit(id));
       }
     });

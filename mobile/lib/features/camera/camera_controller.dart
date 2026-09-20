@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +8,7 @@ import '../clean/clean_controller.dart';
 import '../clean/footage_picker.dart';
 import 'camera_gateway.dart';
 
-enum CameraPhase { opening, ready, recording, saving, permissionDenied, unavailable, failed }
+enum CameraPhase { opening, ready, countdown, recording, saving, permissionDenied, unavailable, failed }
 
 class CameraState {
   const CameraState({
@@ -17,6 +18,7 @@ class CameraState {
     this.torch = false,
     this.canFlip = false,
     this.hasTorch = false,
+    this.countdown = 0,
   });
 
   final CameraPhase phase;
@@ -26,10 +28,15 @@ class CameraState {
   final bool canFlip;
   final bool hasTorch;
 
+  /// Seconds left before recording starts (only during [CameraPhase.countdown]).
+  final int countdown;
+
   bool get isRecording => phase == CameraPhase.recording;
   bool get canRecord => phase == CameraPhase.ready;
+  bool get isCountingDown => phase == CameraPhase.countdown;
 
   CameraState copyWith({
+    int? countdown,
     CameraPhase? phase,
     Duration? elapsed,
     bool? front,
@@ -43,8 +50,12 @@ class CameraState {
     torch: torch ?? this.torch,
     canFlip: canFlip ?? this.canFlip,
     hasTorch: hasTorch ?? this.hasTorch,
+    countdown: countdown ?? this.countdown,
   );
 }
+
+/// Seconds of "get ready" before recording starts. Overridden in tests.
+final recordingCountdownProvider = Provider<int>((ref) => 3);
 
 /// Recording length cap: keeps files well under the upload limit.
 const maxRecording = Duration(minutes: 5);
@@ -102,14 +113,25 @@ class CameraSession extends Notifier<CameraState> {
     }
   }
 
+  Object? _countdownToken;
+
+  /// Counts down (cancellable), then starts recording.
   Future<void> startRecording() async {
     if (!state.canRecord) return;
+    final token = _countdownToken = Object();
+    for (var n = ref.read(recordingCountdownProvider); n > 0; n--) {
+      state = state.copyWith(phase: CameraPhase.countdown, countdown: n);
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!ref.mounted || _countdownToken != token) return;
+    }
+    _countdownToken = null;
     try {
       await _camera.startRecording();
     } on CameraFailure {
-      state = state.copyWith(phase: CameraPhase.failed);
+      if (ref.mounted) state = state.copyWith(phase: CameraPhase.failed);
       return;
     }
+    if (!ref.mounted) return;
     _clock
       ..reset()
       ..start();
@@ -121,6 +143,28 @@ class CameraSession extends Notifier<CameraState> {
     });
   }
 
+  void cancelCountdown() {
+    if (!state.isCountingDown) return;
+    _countdownToken = null;
+    state = state.copyWith(phase: CameraPhase.ready, countdown: 0);
+  }
+
+  /// Throws away the take in progress and returns to the ready state for another try.
+  Future<void> retake() async {
+    if (!state.isRecording) return;
+    _ticker?.cancel();
+    _clock.stop();
+    state = state.copyWith(phase: CameraPhase.saving);
+    try {
+      final video = await _camera.stopRecording();
+      final file = File(video.path);
+      if (file.existsSync()) await file.delete();
+      state = state.copyWith(phase: CameraPhase.ready, elapsed: Duration.zero);
+    } on CameraFailure {
+      state = state.copyWith(phase: CameraPhase.failed);
+    }
+  }
+
   /// Stops recording and starts cleaning the file. Returns true when a clean was started.
   Future<bool> stopAndClean() async {
     if (!state.isRecording) return false;
@@ -130,6 +174,7 @@ class CameraSession extends Notifier<CameraState> {
     state = state.copyWith(phase: CameraPhase.saving, elapsed: length);
     try {
       final video = await _camera.stopRecording();
+      if (!ref.mounted) return false;
       if (video.sizeBytes <= 0) {
         state = state.copyWith(phase: CameraPhase.failed);
         return false;

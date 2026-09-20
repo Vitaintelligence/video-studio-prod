@@ -54,6 +54,7 @@ class CleanState {
 }
 
 String rawDurationKey(String editId) => 'raw_seconds.$editId';
+String rawPathKey(String editId) => 'raw_path.$editId';
 
 /// Record/Upload & Clean: uploads the footage, creates the clean edit, and hands back the job id.
 /// Lives for the whole app session so an upload keeps going if the user leaves the screen.
@@ -111,9 +112,9 @@ class CleanController extends Notifier<CleanState> {
         idempotencyKey: _idempotencyKey!,
       );
       final raw = state.rawSeconds;
-      if (raw != null) {
-        await ref.read(preferencesProvider).setDouble(rawDurationKey(accepted.id), raw);
-      }
+      final prefs = ref.read(preferencesProvider);
+      if (raw != null) await prefs.setDouble(rawDurationKey(accepted.id), raw);
+      await prefs.setString(rawPathKey(accepted.id), footage.path);
       if (!ref.mounted) return;
       state = state.copyWith(phase: CleanPhase.created, editId: accepted.id);
     } on ApiException catch (e) {
@@ -160,3 +161,9 @@ final cleanControllerProvider = NotifierProvider<CleanController, CleanState>(Cl
 final rawSecondsProvider = Provider.family<double?, String>(
   (ref, editId) => ref.watch(preferencesProvider).getDouble(rawDurationKey(editId)),
 );
+
+/// Path of the raw recording behind an edit, only while the file still exists on this device.
+final rawPathProvider = Provider.family<String?, String>((ref, editId) {
+  final path = ref.watch(preferencesProvider).getString(rawPathKey(editId));
+  return path != null && File(path).existsSync() ? path : null;
+});

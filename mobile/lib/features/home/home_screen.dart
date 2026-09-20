@@ -134,7 +134,6 @@ class HomeScreen extends ConsumerWidget {
     final persona = ref.watch(onboardingProvider.select((s) => s.persona));
     final caps = ref.watch(capabilitiesProvider).value;
     final projects = ref.watch(projectsProvider).value ?? const <ApiProject>[];
-    final clean = ref.watch(cleanControllerProvider);
     final unavailable = caps != null && !caps.editing;
     final intents = [
       for (final i in intentOrderFor(persona))
@@ -171,14 +170,6 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: AppSpacing.sm),
             const Text('What are you making today?', style: AppTypography.display),
             const SizedBox(height: AppSpacing.xl),
-            if (clean.isBusy) ...[
-              _Notice(
-                icon: CupertinoIcons.arrow_up_circle,
-                message: 'Uploading your video',
-                onTap: () => context.push(Routes.upload),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-            ],
             if (unavailable)
               const _Notice(
                 icon: CupertinoIcons.exclamationmark_triangle_fill,
@@ -338,32 +329,25 @@ class _SheetRow extends StatelessWidget {
 }
 
 class _Notice extends StatelessWidget {
-  const _Notice({required this.icon, required this.message, this.onTap});
+  const _Notice({required this.icon, required this.message});
 
   final IconData icon;
   final String message;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Semantics(
-    button: onTap != null,
     label: message,
     excludeSemantics: true,
-    onTap: onTap,
-    child: GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mediumAll),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              Icon(icon, size: 20, color: AppColors.warning),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(child: Text(message, style: AppTypography.body)),
-            ],
-          ),
+    child: DecoratedBox(
+      decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mediumAll),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.warning),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(message, style: AppTypography.body)),
+          ],
         ),
       ),
     ),

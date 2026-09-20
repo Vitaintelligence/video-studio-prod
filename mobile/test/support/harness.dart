@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:adcut_mobile/app/providers.dart';
+import 'package:adcut_mobile/features/camera/camera_controller.dart';
 import 'package:adcut_mobile/features/camera/camera_gateway.dart';
 import 'package:adcut_mobile/features/clean/footage_picker.dart';
 import 'package:flutter/widgets.dart';
@@ -31,6 +32,7 @@ class FakeCamera implements CameraGateway {
   bool torchOn = false;
   bool closed = false;
   int openCount = 0;
+  int startCount = 0;
   String? lastFile;
 
   @override
@@ -50,7 +52,7 @@ class FakeCamera implements CameraGateway {
   Widget preview() => const SizedBox(width: 90, height: 160);
 
   @override
-  Future<void> startRecording() async {}
+  Future<void> startRecording() async => startCount++;
 
   @override
   Future<RecordedVideo> stopRecording() async {
@@ -67,16 +69,19 @@ class FakeCamera implements CameraGateway {
 
 class FakeExporter implements ExportService {
   final List<String> exported = [];
+  final List<ExportTarget> targets = [];
   Object? failWith;
 
   @override
   Future<void> export({
     required String url,
     required String fileName,
+    required ExportTarget target,
     void Function(double progress)? onProgress,
   }) async {
     if (failWith != null) throw failWith!;
     exported.add(url);
+    targets.add(target);
   }
 }
 
@@ -95,19 +100,20 @@ class Harness {
     return Harness._(backend ?? FakeBackend(), await SharedPreferences.getInstance());
   }
 
-  List<Override> get overrides => [
+  List<Override> overridesWith({int countdown = 0}) => [
     preferencesProvider.overrideWithValue(prefs),
     apiProvider.overrideWithValue(backend.api()),
     footagePickerProvider.overrideWithValue(picker),
     exportServiceProvider.overrideWithValue(exporter),
     cameraGatewayProvider.overrideWithValue(camera),
     pollIntervalProvider.overrideWithValue(const Duration(milliseconds: 10)),
+    recordingCountdownProvider.overrideWithValue(countdown),
   ];
 
-  ProviderContainer container() {
-    final c = ProviderContainer(retry: (_, _) => null, overrides: overrides);
-    return c;
-  }
+  List<Override> get overrides => overridesWith();
+
+  ProviderContainer container({int countdown = 0}) =>
+      ProviderContainer(retry: (_, _) => null, overrides: overridesWith(countdown: countdown));
 }
 
 /// Writes a small file that stands in for a video, and returns its path.

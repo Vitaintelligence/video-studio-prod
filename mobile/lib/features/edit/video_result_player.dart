@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/cupertino.dart';
 import 'package:video_player/video_player.dart';
 
@@ -10,9 +12,10 @@ import '../../core/widgets/buttons.dart';
 
 /// Plays a finished edit with minimal chrome: tap to play/pause and a scrubbable progress bar.
 class VideoResultPlayer extends StatefulWidget {
-  const VideoResultPlayer({super.key, required this.url, required this.aspectRatio});
+  const VideoResultPlayer({super.key, required this.source, required this.aspectRatio});
 
-  final String url;
+  /// An http(s) URL, or a local file path.
+  final String source;
 
   /// width / height of the output (e.g. 9 / 16).
   final double aspectRatio;
@@ -34,7 +37,7 @@ class _VideoResultPlayerState extends State<VideoResultPlayer> {
   @override
   void didUpdateWidget(VideoResultPlayer old) {
     super.didUpdateWidget(old);
-    if (old.url != widget.url) _open();
+    if (old.source != widget.source) _open();
   }
 
   @override
@@ -45,7 +48,9 @@ class _VideoResultPlayerState extends State<VideoResultPlayer> {
 
   Future<void> _open() async {
     final previous = _controller;
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    final controller = widget.source.startsWith('http')
+        ? VideoPlayerController.networkUrl(Uri.parse(widget.source))
+        : VideoPlayerController.file(File(widget.source));
     _controller = controller;
     _failed = false;
     if (previous != null) {

@@ -11,6 +11,7 @@ import '../../core/design/app_spacing.dart';
 import '../../core/design/app_typography.dart';
 import '../../core/format.dart';
 import '../../core/widgets/app_selector.dart';
+import '../../core/widgets/app_sheet.dart';
 import '../../core/widgets/buttons.dart';
 import '../clean/clean_controller.dart';
 import '../settings/ad_options.dart';
@@ -39,12 +40,36 @@ class ResultView extends ConsumerStatefulWidget {
 
 class _ResultViewState extends ConsumerState<ResultView> {
   bool _exporting = false;
+  bool _showRaw = false;
 
   Future<void> _useCut(String url, int version) async {
     if (_exporting) return;
+    final target = await showAppSheet<ExportTarget>(
+      context,
+      title: 'Use this cut',
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ExportRow(
+            icon: CupertinoIcons.photo,
+            label: 'Save to Photos',
+            onTap: () => Navigator.of(sheetContext).pop(ExportTarget.photos),
+          ),
+          _ExportRow(
+            icon: CupertinoIcons.share,
+            label: 'Share…',
+            onTap: () => Navigator.of(sheetContext).pop(ExportTarget.share),
+          ),
+        ],
+      ),
+    );
+    if (target == null || !mounted) return;
     setState(() => _exporting = true);
     try {
-      await ref.read(exportServiceProvider).export(url: url, fileName: 'adcut-v$version.mp4');
+      await ref.read(exportServiceProvider).export(url: url, fileName: 'adcut-v$version.mp4', target: target);
+      if (mounted && target == ExportTarget.photos) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to Photos')));
+      }
     } on ApiException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.userMessage)));
     } on Object {
@@ -71,6 +96,7 @@ class _ResultViewState extends ConsumerState<ResultView> {
     final done = state.completedVersions;
     final parts = AdFormat.fromId(job.aspectRatio).id.split(':');
     final ratio = double.parse(parts[0]) / double.parse(parts[1]);
+    final rawPath = ref.watch(rawPathProvider(widget.editId));
     final saved = raw != null && result != null ? Format.saved(raw, result) : null;
 
     return Column(
@@ -107,7 +133,16 @@ class _ResultViewState extends ConsumerState<ResultView> {
                   ),
                 ),
               const SizedBox(height: AppSpacing.md),
-              VideoResultPlayer(url: shown.outputUrl!, aspectRatio: ratio),
+              if (rawPath != null) ...[
+                SegmentedChoice<bool>(
+                  label: 'Video',
+                  value: _showRaw,
+                  choices: const [Choice(value: false, label: 'Cut'), Choice(value: true, label: 'Raw')],
+                  onChanged: (v) => setState(() => _showRaw = v),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              VideoResultPlayer(source: _showRaw && rawPath != null ? rawPath : shown.outputUrl!, aspectRatio: ratio),
               if (done.length > 1) ...[
                 const SizedBox(height: AppSpacing.sm),
                 AppSelector<String>(
@@ -167,4 +202,34 @@ class _ResultViewState extends ConsumerState<ResultView> {
       ],
     );
   }
+}
+
+class _ExportRow extends StatelessWidget {
+  const _ExportRow({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: label,
+    excludeSemantics: true,
+    onTap: onTap,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: AppColors.textSecondary),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(label, style: AppTypography.body)),
+          ],
+        ),
+      ),
+    ),
+  );
 }

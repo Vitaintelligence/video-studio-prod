@@ -90,7 +90,7 @@ class _AdjustViewState extends ConsumerState<AdjustView> {
             children: [
               const Text('Ask AI to change anything', style: AppTypography.title),
               const SizedBox(height: AppSpacing.sm),
-              VideoResultPlayer(url: shown.outputUrl!, aspectRatio: ratio),
+              VideoResultPlayer(source: shown.outputUrl!, aspectRatio: ratio),
               const SizedBox(height: AppSpacing.sm),
               Semantics(
                 liveRegion: true,

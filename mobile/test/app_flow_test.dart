@@ -1,4 +1,5 @@
 import 'package:adcut_mobile/features/clean/footage_picker.dart';
+import 'package:adcut_mobile/features/edit/export_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -264,8 +265,14 @@ void main() {
       expect(find.text('Adjust'), findsOneWidget);
       expect(find.text('Create variants'), findsOneWidget);
       await tester.tap(find.text('Use this cut'));
-      await settle(tester, steps: 3);
+      await settle(tester, steps: 5);
+      expect(find.text('Save to Photos'), findsOneWidget);
+      expect(find.text('Share…'), findsOneWidget);
+      await tester.tap(find.text('Save to Photos'));
+      await settle(tester, steps: 5);
       expect(h.exporter.exported, [FakeBackend.outputUrl]);
+      expect(h.exporter.targets, [ExportTarget.photos]);
+      expect(find.text('Saved to Photos'), findsOneWidget);
       await unmount(tester);
     });
 

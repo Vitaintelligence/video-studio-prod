@@ -40,6 +40,8 @@ class ApiException implements Exception {
       case 'NETWORK_ERROR':
       case 'TIMEOUT_CLIENT':
         return "Can't reach AdCut right now. Check your connection and try again.";
+      case 'PHOTOS_DENIED':
+        return 'Allow AdCut to save to Photos in Settings, then try again.';
       case 'EXPORT_FAILED':
         return 'Export failed. Try again.';
       case 'UPLOAD_FAILED':

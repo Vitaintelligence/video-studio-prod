@@ -162,7 +162,7 @@ class _VariantCardState extends ConsumerState<VariantCard> {
       title: widget.variant.variant?.label ?? 'Variant',
       builder: (_) => Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-        child: VideoResultPlayer(url: widget.variant.outputUrl!, aspectRatio: _ratio),
+        child: VideoResultPlayer(source: widget.variant.outputUrl!, aspectRatio: _ratio),
       ),
     );
   }
@@ -173,7 +173,11 @@ class _VariantCardState extends ConsumerState<VariantCard> {
     try {
       await ref
           .read(exportServiceProvider)
-          .export(url: widget.variant.outputUrl!, fileName: 'adcut-${widget.variant.id}.mp4');
+          .export(
+            url: widget.variant.outputUrl!,
+            fileName: 'adcut-${widget.variant.id}.mp4',
+            target: ExportTarget.share,
+          );
     } on ApiException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.userMessage)));

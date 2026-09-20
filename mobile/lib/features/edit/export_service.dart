@@ -1,15 +1,23 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api/api_exception.dart';
 
-/// Downloads a finished video and hands it to the iOS share sheet (Save Video, AirDrop, Files, apps).
+enum ExportTarget { photos, share }
+
+/// Downloads a finished video, then saves it to Photos or hands it to the system share sheet.
 abstract interface class ExportService {
-  Future<void> export({required String url, required String fileName, void Function(double progress)? onProgress});
+  Future<void> export({
+    required String url,
+    required String fileName,
+    required ExportTarget target,
+    void Function(double progress)? onProgress,
+  });
 }
 
 class ShareSheetExportService implements ExportService {
@@ -19,6 +27,7 @@ class ShareSheetExportService implements ExportService {
   Future<void> export({
     required String url,
     required String fileName,
+    required ExportTarget target,
     void Function(double progress)? onProgress,
   }) async {
     final client = http.Client();
@@ -41,12 +50,22 @@ class ShareSheetExportService implements ExportService {
       }
       await sink.close();
       sink = null;
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path, mimeType: 'video/mp4')]));
+      switch (target) {
+        case ExportTarget.photos:
+          await Gal.putVideo(file.path);
+        case ExportTarget.share:
+          await SharePlus.instance.share(ShareParams(files: [XFile(file.path, mimeType: 'video/mp4')]));
+      }
       await file.delete();
     } on http.ClientException {
       throw const ApiException.network();
     } on SocketException {
       throw const ApiException.network();
+    } on GalException catch (e) {
+      throw ApiException(
+        code: e.type == GalExceptionType.accessDenied ? 'PHOTOS_DENIED' : 'EXPORT_FAILED',
+        message: 'Could not save the video.',
+      );
     } finally {
       await sink?.close();
       client.close();
