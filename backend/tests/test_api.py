@@ -299,6 +299,16 @@ def test_capabilities_unknown_then_published(client, fake_redis, env):
     assert "key" not in json.dumps(r).lower().replace("keys", "")
 
 
+def test_mock_runtime_generation_does_not_require_paid_visual_provider(env):
+    from server.services.capabilities import normalize
+
+    raw = {"registry_ok": True, "capabilities": {}, "composition_runtimes": {"ffmpeg": True}}
+    caps = normalize(raw, env["settings"])
+    assert env["settings"].orchestrator_provider == "mock"
+    assert caps["generation_available"] is True
+    assert caps["pipelines"] == [{"id": "app-cinematic", "enabled": True}]
+
+
 # -- uploads -----------------------------------------------------------------
 
 def test_uploads_local_dev_returns_signed_put_to_api(client):

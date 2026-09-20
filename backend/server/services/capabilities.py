@@ -73,8 +73,12 @@ def normalize(raw: dict[str, Any], settings: Settings) -> dict[str, Any]:
     pipelines_enabled = enabled_pipelines()
     composition_ok = bool(runtimes.get("ffmpeg"))
     visuals = features["text_to_video"] or features["image_generation"]
-    agent_ok = settings.orchestrator_provider == "mock" or bool(settings.anthropic_api_key)
-    available = bool(raw.get("registry_ok")) and composition_ok and visuals and bool(pipelines_enabled) and agent_ok
+    # Mock renders locally and intentionally needs no paid visual or agent provider.
+    # Real prompt-to-video generation requires both a visual provider and the Claude agent runtime.
+    runtime_ready = settings.orchestrator_provider == "mock" or (
+        settings.orchestrator_provider == "claude_agent_sdk" and visuals and bool(settings.anthropic_api_key)
+    )
+    available = bool(raw.get("registry_ok")) and composition_ok and bool(pipelines_enabled) and runtime_ready
     # Product capabilities. Deterministic editing needs only FFmpeg: it works with no provider keys at all.
     editing = composition_ok and bool(pipelines_enabled)
     has_video_model = bool(settings.openrouter_video_model or settings.openrouter_video_profiles)
