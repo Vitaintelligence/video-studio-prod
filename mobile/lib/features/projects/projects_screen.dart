@@ -49,7 +49,7 @@ class ProjectsScreen extends ConsumerWidget {
           onRefresh: controller.refresh,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.xl),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.floatingBarOffset),
             children: [
               for (final (heading, group) in [
                 (

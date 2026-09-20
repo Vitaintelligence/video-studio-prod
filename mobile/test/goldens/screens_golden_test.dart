@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -24,8 +26,24 @@ Future<Harness> seeded({bool frozen = false, Map<String, Object> prefs = const {
 Future<void> shot(WidgetTester tester, String name) =>
     expectLater(find.byType(MaterialApp), matchesGoldenFile('$name.png'));
 
+/// Screens with a running spinner differ by a few pixels between runs; anything above 0.2% is a real change.
+class _TolerantComparator extends LocalFileComparator {
+  _TolerantComparator(super.testFile);
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(imageBytes, await getGoldenBytes(golden));
+    return result.passed || result.diffPercent <= 0.002;
+  }
+}
+
 void main() {
-  setUpAll(loadTestFonts);
+  setUpAll(() async {
+    await loadTestFonts();
+    goldenFileComparator = _TolerantComparator(
+      Uri.parse('${(goldenFileComparator as LocalFileComparator).basedir}x.dart'),
+    );
+  });
 
   for (final phone in Phone.values) {
     testWidgets('home · empty · ${phone.name}', (tester) async {

@@ -19,4 +19,7 @@ abstract final class AppSpacing {
   /// Control heights.
   static const double buttonHeight = 52;
   static const double fieldHeight = 52;
+
+  /// Bottom scroll offset to clear the floating navigation pill.
+  static const double floatingBarOffset = 100;
 }

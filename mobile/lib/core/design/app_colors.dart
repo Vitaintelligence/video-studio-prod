@@ -12,11 +12,13 @@ abstract final class AppColors {
   static const Color textSecondary = Color(0xFFA1A7B2);
   static const Color textMuted = Color(0xFF767D89);
 
-  static const Color accent = Color(0xFF3D6BF2);
-  static const Color accentPressed = Color(0xFF3560DB);
-  static const Color onAccent = Color(0xFFFFFFFF);
-  static const Color accentText = Color(0xFF8FA9FF);
+  static const Color accent = Color(0xFF00E5FF);
+  static const Color accentPressed = Color(0xFF00BCE6);
+  static const Color onAccent = Color(0xFF07090E);
+  static const Color accentText = Color(0xFF00E5FF);
   static const Color accentDisabled = Color(0xFF22262E);
+  static const Color accentGlow = Color(0x3300E5FF);
+  static const Color accentSubtle = Color(0x1800E5FF);
 
   static const Color success = Color(0xFF3DBE6B);
   static const Color warning = Color(0xFFE8A93A);

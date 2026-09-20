@@ -53,6 +53,7 @@ const maxRecording = Duration(minutes: 5);
 class CameraSession extends Notifier<CameraState> {
   Timer? _ticker;
   final Stopwatch _clock = Stopwatch();
+  bool _opening = false;
 
   CameraGateway get _camera => ref.read(cameraGatewayProvider);
 
@@ -63,6 +64,8 @@ class CameraSession extends Notifier<CameraState> {
   }
 
   Future<void> open({bool? front}) async {
+    if (_opening) return;
+    _opening = true;
     final useFront = front ?? state.front;
     state = state.copyWith(phase: CameraPhase.opening, front: useFront, torch: false);
     try {
@@ -78,6 +81,8 @@ class CameraSession extends Notifier<CameraState> {
           CameraFailureKind.failed => CameraPhase.failed,
         },
       );
+    } finally {
+      _opening = false;
     }
   }
 
@@ -149,6 +154,7 @@ class CameraSession extends Notifier<CameraState> {
   Future<bool> handleInterruption() async {
     if (state.isRecording) return stopAndClean();
     await _camera.close();
+    state = state.copyWith(phase: CameraPhase.opening);
     return false;
   }
 }

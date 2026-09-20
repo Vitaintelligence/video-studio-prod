@@ -99,7 +99,7 @@ void main() {
       final h = await Harness.create();
       await pumpApp(tester, h);
       await settle(tester, steps: 2);
-      await tester.tap(semantic('Account'));
+      await tester.tap(find.byIcon(CupertinoIcons.person_crop_circle));
       await settle(tester, steps: 5);
       expect(find.text('Default platform'), findsOneWidget);
       await tester.tap(find.text('TikTok'));

@@ -95,7 +95,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
                     borderRadius: AppRadius.mediaAll,
                     child: ColoredBox(
                       color: AppColors.surface,
-                      child: state.phase == CameraPhase.opening ? const LoadingView() : Center(child: _Preview()),
+                      child: (state.phase == CameraPhase.opening || state.phase == CameraPhase.saving)
+                          ? const LoadingView()
+                          : Center(child: _Preview()),
                     ),
                   ),
                 ),
