@@ -1,0 +1,149 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import '../support/app_pump.dart';
+import '../support/harness.dart';
+
+/// Design-review screenshots. They also fail on any layout overflow at these phone sizes / text scales.
+/// Regenerate with: flutter test --update-goldens test/goldens
+Future<void> settle(WidgetTester tester, {int steps = 8}) async {
+  for (var i = 0; i < steps; i++) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+Future<Harness> seeded({bool frozen = false, Map<String, Object> prefs = const {}}) async {
+  final h = await Harness.create(prefs: prefs);
+  h.backend.assets['asset-1'] = {'id': 'asset-1', 'status': 'uploaded'};
+  final e = h.backend.newEditForTest('Remove awkward pauses and dead air. Keep the pacing tight.');
+  h.backend.edits[e['id'] as String]!['status'] = frozen ? 'running' : 'completed';
+  h.backend.freezeProgress = frozen;
+  return h;
+}
+
+Future<void> shot(WidgetTester tester, String name) =>
+    expectLater(find.byType(MaterialApp), matchesGoldenFile('$name.png'));
+
+void main() {
+  setUpAll(loadTestFonts);
+
+  for (final phone in Phone.values) {
+    testWidgets('home · empty · ${phone.name}', (tester) async {
+      final h = await Harness.create();
+      await pumpApp(tester, h, phone: phone);
+      await settle(tester);
+      await shot(tester, 'home_empty_${phone.name}');
+      await unmount(tester);
+    });
+  }
+
+  testWidgets('home · recents · compact · text x1.5', (tester) async {
+    final h = await seeded(prefs: {'onboarding.persona': 'agency'});
+    await pumpApp(tester, h, phone: Phone.compact, textScale: 1.5);
+    await settle(tester);
+    await shot(tester, 'home_recents_compact_x1_5');
+    await unmount(tester);
+  });
+
+  testWidgets('camera · standard', (tester) async {
+    final h = await Harness.create();
+    await pumpApp(tester, h, location: '/camera');
+    await settle(tester);
+    await shot(tester, 'camera_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('onboarding · question · compact', (tester) async {
+    final h = await Harness.create(prefs: {'onboarding.done': false});
+    await pumpApp(tester, h, phone: Phone.compact);
+    await settle(tester);
+    await shot(tester, 'onboarding_question_compact');
+    await unmount(tester);
+  });
+
+  testWidgets('onboarding · estimate · standard', (tester) async {
+    final h = await Harness.create(
+      prefs: {
+        'onboarding.done': false,
+        'onboarding.persona': 'ugcCreator',
+        'onboarding.niche': 'beauty',
+        'onboarding.weekly_volume': 'upTo15',
+        'onboarding.editing_time': 'm30to60',
+      },
+    );
+    await pumpApp(tester, h);
+    await settle(tester);
+    for (final answer in ['UGC creator', 'Beauty', '6–15', '30–60 min']) {
+      await tester.tap(find.text(answer));
+      await settle(tester, steps: 4);
+    }
+    await shot(tester, 'onboarding_estimate_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('processing · standard', (tester) async {
+    final h = await seeded(frozen: true);
+    await pumpApp(tester, h, location: '/edits/edit-1');
+    await settle(tester);
+    await shot(tester, 'processing_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('result · standard', (tester) async {
+    final h = await seeded(prefs: {'raw_seconds.edit-1': 77.0});
+    await pumpApp(tester, h, location: '/edits/edit-1');
+    await settle(tester, steps: 10);
+    await shot(tester, 'result_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('result · compact · text x1.5', (tester) async {
+    final h = await seeded(prefs: {'raw_seconds.edit-1': 77.0});
+    await pumpApp(tester, h, location: '/edits/edit-1', phone: Phone.compact, textScale: 1.5);
+    await settle(tester, steps: 10);
+    await shot(tester, 'result_compact_x1_5');
+    await unmount(tester);
+  });
+
+  testWidgets('adjust · standard', (tester) async {
+    final h = await seeded();
+    await pumpApp(tester, h, location: '/edits/edit-1');
+    await settle(tester, steps: 10);
+    await tester.tap(find.text('Adjust'));
+    await settle(tester);
+    await shot(tester, 'adjust_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('projects · standard', (tester) async {
+    final h = await seeded();
+    await pumpApp(tester, h, location: '/projects');
+    await settle(tester);
+    await shot(tester, 'projects_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('variants · standard', (tester) async {
+    final h = await seeded();
+    await pumpApp(tester, h, location: '/edits/edit-1/variants');
+    await settle(tester);
+    await tester.tap(find.text('Create variants'));
+    await settle(tester, steps: 40);
+    await shot(tester, 'variants_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('account · standard', (tester) async {
+    final h = await Harness.create(
+      prefs: {
+        'onboarding.persona': 'ugcCreator',
+        'onboarding.weekly_volume': 'upTo15',
+        'onboarding.editing_time': 'm30to60',
+      },
+    );
+    await pumpApp(tester, h, location: '/account');
+    await settle(tester);
+    await shot(tester, 'account_standard');
+    await unmount(tester);
+  });
+}

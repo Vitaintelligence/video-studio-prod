@@ -133,3 +133,42 @@ def test_log_redaction_processor():
     assert out["authorization"] == "[redacted]" and out["nested"]["api_key"] == "[redacted]"
     assert "sk-ant" not in out["nested"]["note"] and "pw@" not in out["url"] and "deadbeef" not in out["url"]
     assert "[redacted]" in redact_text("Bearer abc.def")
+
+
+def test_supabase_style_configuration_uses_path_style_urls_and_generic_env_names(monkeypatch):
+    """Supabase Storage speaks the S3 protocol but needs path-style addressing and a real region."""
+    from urllib.parse import urlparse
+
+    from server.core.config import Settings
+
+    for k, v in {"STORAGE_BACKEND": "s3", "S3_ENDPOINT_URL": "https://abcd1234.storage.supabase.co/storage/v1/s3",
+                 "S3_ACCESS_KEY_ID": "AKIDTEST", "S3_SECRET_ACCESS_KEY": "secret", "S3_BUCKET": "videos",
+                 "S3_REGION": "ap-south-1"}.items():
+        monkeypatch.setenv(k, v)
+    s = Settings(_env_file=None)
+    assert s.uses_object_storage and s.r2_bucket == "videos" and s.r2_region == "ap-south-1"
+
+    st = R2Storage(s)  # real boto3 client, no network: presigning is a local computation
+    assert st.client.meta.config.s3["addressing_style"] == "path"
+    url = st.presign_upload("uploads/dev/abc/clip.mp4", "video/mp4", 600).url
+    parsed = urlparse(url)
+    assert parsed.netloc == "abcd1234.storage.supabase.co"
+    assert parsed.path == "/storage/v1/s3/videos/uploads/dev/abc/clip.mp4"  # bucket in the PATH, not the hostname
+    assert "X-Amz-Signature" in parsed.query and "ap-south-1" in parsed.query
+    assert st.url_for("generations/x/final.mp4").startswith("https://abcd1234.storage.supabase.co/storage/v1/s3/videos/generations/x/final.mp4?")
+    pub = R2Storage(s.model_copy(update={"r2_public_base_url": "https://abcd1234.supabase.co/storage/v1/object/public/videos"}))
+    assert pub.url_for("generations/x/final.mp4") == "https://abcd1234.supabase.co/storage/v1/object/public/videos/generations/x/final.mp4"
+
+
+def test_original_r2_env_names_still_work_and_missing_credentials_are_reported(monkeypatch):
+    import pytest
+
+    from server.core.config import Settings
+
+    for k, v in {"STORAGE_BACKEND": "r2", "R2_ENDPOINT_URL": "https://acc.r2.cloudflarestorage.com", "R2_ACCESS_KEY_ID": "id",
+                 "R2_SECRET_ACCESS_KEY": "sec", "R2_BUCKET": "b"}.items():
+        monkeypatch.setenv(k, v)
+    assert Settings(_env_file=None).r2_bucket == "b"
+    monkeypatch.delenv("R2_BUCKET")
+    with pytest.raises(ValueError, match="S3_BUCKET"):
+        Settings(_env_file=None)

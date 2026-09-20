@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         env_ignore_empty=True,  # `KEY=` lines in .env.example mean "unset"
+        populate_by_name=True,
     )
 
     # --- general -----------------------------------------------------------
@@ -72,14 +73,19 @@ class Settings(BaseSettings):
     local_job_retention_hours: int = 24
 
     # --- storage -----------------------------------------------------------
-    storage_backend: Literal["local", "r2"] = "local"
+    storage_backend: Literal["local", "r2", "s3"] = "local"  # r2 and s3 are the same S3-compatible client
     local_storage_path: Path = Path("/workspace/storage")
-    r2_endpoint_url: str | None = None
-    r2_access_key_id: SecretStr | None = None
-    r2_secret_access_key: SecretStr | None = None
-    r2_bucket: str | None = None
-    r2_public_base_url: str | None = None  # set => public URLs, unset => signed URLs
-    r2_region: str = "auto"
+    # S3-compatible object storage: Cloudflare R2, Supabase Storage, AWS S3, Backblaze B2, ...
+    # Generic S3_* names are preferred; the original R2_* names keep working.
+    r2_endpoint_url: str | None = Field(default=None, validation_alias=AliasChoices("S3_ENDPOINT_URL", "R2_ENDPOINT_URL"))
+    r2_access_key_id: SecretStr | None = Field(default=None, validation_alias=AliasChoices("S3_ACCESS_KEY_ID", "R2_ACCESS_KEY_ID"))
+    r2_secret_access_key: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("S3_SECRET_ACCESS_KEY", "R2_SECRET_ACCESS_KEY"))
+    r2_bucket: str | None = Field(default=None, validation_alias=AliasChoices("S3_BUCKET", "R2_BUCKET"))
+    # set => public URLs (no expiry), unset => signed URLs
+    r2_public_base_url: str | None = Field(default=None, validation_alias=AliasChoices("S3_PUBLIC_BASE_URL", "R2_PUBLIC_BASE_URL"))
+    # R2 uses "auto". Supabase / AWS need the real region of the project/bucket (e.g. "us-east-1", "ap-south-1").
+    r2_region: str = Field(default="auto", validation_alias=AliasChoices("S3_REGION", "R2_REGION"))
     signed_url_ttl_seconds: int = 3600
 
     # --- limits ------------------------------------------------------------
@@ -137,19 +143,19 @@ class Settings(BaseSettings):
             raise ValueError("GENERATION_HARD_TIMEOUT_SECONDS must exceed the soft timeout")
         if self.celery_visibility_timeout_seconds <= self.generation_hard_timeout_seconds:
             raise ValueError("CELERY_VISIBILITY_TIMEOUT_SECONDS must exceed the hard timeout")
-        if self.storage_backend == "r2":
+        if self.uses_object_storage:
             missing = [
                 name
                 for name, val in (
-                    ("R2_ENDPOINT_URL", self.r2_endpoint_url),
-                    ("R2_ACCESS_KEY_ID", self.r2_access_key_id),
-                    ("R2_SECRET_ACCESS_KEY", self.r2_secret_access_key),
-                    ("R2_BUCKET", self.r2_bucket),
+                    ("S3_ENDPOINT_URL", self.r2_endpoint_url),
+                    ("S3_ACCESS_KEY_ID", self.r2_access_key_id),
+                    ("S3_SECRET_ACCESS_KEY", self.r2_secret_access_key),
+                    ("S3_BUCKET", self.r2_bucket),
                 )
                 if not val
             ]
             if missing:
-                raise ValueError(f"STORAGE_BACKEND=r2 requires {', '.join(missing)}")
+                raise ValueError(f"STORAGE_BACKEND={self.storage_backend} requires {', '.join(missing)} (R2_* names also accepted)")
         if self.is_production:
             token = self.dev_api_token.get_secret_value() if self.dev_api_token else ""
             if len(token) < 24:
@@ -160,6 +166,10 @@ class Settings(BaseSettings):
                 # Allowed (e.g. a volume) but loudly discouraged; see README.
                 pass
         return self
+
+    @property
+    def uses_object_storage(self) -> bool:
+        return self.storage_backend in ("r2", "s3")
 
     @property
     def is_production(self) -> bool:

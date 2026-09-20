@@ -157,7 +157,9 @@ class R2Storage(StorageService):
                 aws_access_key_id=settings.r2_access_key_id.get_secret_value(),
                 aws_secret_access_key=settings.r2_secret_access_key.get_secret_value(),
                 region_name=settings.r2_region,
-                config=Config(signature_version="s3v4", retries={"max_attempts": 4, "mode": "standard"}),
+                # path-style addressing (endpoint/bucket/key): required by Supabase, accepted by R2 and MinIO
+                config=Config(signature_version="s3v4", s3={"addressing_style": "path"},
+                              retries={"max_attempts": 4, "mode": "standard"}),
             )
         self.client = client
 
@@ -226,7 +228,7 @@ class R2Storage(StorageService):
 
 
 def build_storage(settings: Settings) -> StorageService:
-    if settings.storage_backend == "r2":
+    if settings.uses_object_storage:
         return R2Storage(settings)
     return LocalStorage(settings.local_storage_path)
 

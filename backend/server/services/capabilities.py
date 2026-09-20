@@ -128,7 +128,7 @@ def capabilities_document(redis_client, settings: Settings | None = None) -> dic
         "aspect_ratios": ["9:16", "1:1", "16:9"],
         "quality": ["standard", "cinematic"],
         "max_prompt_chars": 2000,
-        "uploads": settings.storage_backend == "r2" or not settings.is_production,
+        "uploads": settings.uses_object_storage or not settings.is_production,
     }
     if snap is None:
         # No worker has reported yet (or the snapshot expired): say so honestly.

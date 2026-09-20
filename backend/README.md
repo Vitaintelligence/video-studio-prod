@@ -27,6 +27,21 @@ Storage upload errors are retried by Celery with backoff; a retry **reuses the a
 re-run the agent. Worker death is covered by `acks_late` + `reject_on_worker_lost`; SIGTERM (Railway deploy) stops the agent,
 puts the job back to `queued` and re-publishes it.
 
+
+### Storage providers (S3-compatible)
+
+`STORAGE_BACKEND=s3` (or `r2`) works with any S3-compatible store. Preferred variable names: `S3_ENDPOINT_URL`,
+`S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, `S3_PUBLIC_BASE_URL` (the older `R2_*` names still work).
+
+| Provider | `S3_ENDPOINT_URL` | `S3_REGION` | `S3_PUBLIC_BASE_URL` (optional) |
+|---|---|---|---|
+| Supabase Storage | `https://<project-ref>.storage.supabase.co/storage/v1/s3` | your project's region, e.g. `ap-south-1` | `https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>` (public bucket) |
+| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | the bucket's public r2.dev / custom domain |
+
+Supabase: create a bucket (Storage), then Project Settings -> Storage -> S3 Connection -> create access keys. Those keys
+have full access to every bucket in the project: keep them on Railway (api + worker) only. Watch the plan's per-file upload
+limit (the free plan's is small; raw UGC clips are often larger) and egress allowance.
+
 ### Runtimes
 
 `ORCHESTRATOR_PROVIDER` selects one; `server/runtime/base.py` is the only contract the rest of the backend imports.
