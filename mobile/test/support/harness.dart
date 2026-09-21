@@ -112,8 +112,10 @@ class Harness {
 
   List<Override> get overrides => overridesWith();
 
-  ProviderContainer container({int countdown = 0}) =>
-      ProviderContainer(retry: (_, _) => null, overrides: overridesWith(countdown: countdown));
+  ProviderContainer container({int countdown = 0}) => ProviderContainer(
+    retry: (_, _) => null,
+    overrides: overridesWith(countdown: countdown),
+  );
 }
 
 /// Writes a small file that stands in for a video, and returns its path.

@@ -137,7 +137,10 @@ class _ResultViewState extends ConsumerState<ResultView> {
                 SegmentedChoice<bool>(
                   label: 'Video',
                   value: _showRaw,
-                  choices: const [Choice(value: false, label: 'Cut'), Choice(value: true, label: 'Raw')],
+                  choices: const [
+                    Choice(value: false, label: 'Cut'),
+                    Choice(value: true, label: 'Raw'),
+                  ],
                   onChanged: (v) => setState(() => _showRaw = v),
                 ),
                 const SizedBox(height: AppSpacing.xs),
