@@ -151,6 +151,22 @@ class UploadReservation {
   String toString() => 'UploadReservation(asset: $assetId, host: ${url.host})';
 }
 
+class CutRange {
+  final int source;
+  final double start;
+  final double end;
+
+  const CutRange({required this.source, required this.start, required this.end});
+
+  double get duration => end - start;
+
+  factory CutRange.fromJson(Map<String, dynamic> j) => CutRange(
+    source: _int(j['source']),
+    start: j['start'] is num ? (j['start'] as num).toDouble() : 0,
+    end: j['end'] is num ? (j['end'] as num).toDouble() : 0,
+  );
+}
+
 /// One version of an edit (the original, or a prompt-to-edit revision).
 class EditRevision {
   final String id;
@@ -160,6 +176,7 @@ class EditRevision {
   final int progress;
   final String? outputUrl;
   final String? thumbnailUrl;
+  final List<CutRange> keptRanges;
   final DateTime createdAt;
 
   const EditRevision({
@@ -170,6 +187,7 @@ class EditRevision {
     required this.progress,
     required this.outputUrl,
     required this.thumbnailUrl,
+    required this.keptRanges,
     required this.createdAt,
   });
 
@@ -181,6 +199,11 @@ class EditRevision {
     progress: _int(j['progress']),
     outputUrl: _str(j['output_url']),
     thumbnailUrl: _str(j['thumbnail_url']),
+    keptRanges: [
+      if (j['kept_ranges'] is List)
+        for (final r in (j['kept_ranges'] as List))
+          if (r is Map) CutRange.fromJson(Map<String, dynamic>.from(r)),
+    ],
     createdAt: _date(j['created_at']),
   );
 }
@@ -211,6 +234,8 @@ class EditJob {
   final String? outputUrl;
   final String? thumbnailUrl;
   final List<String> warnings;
+  final Map<String, Object> insights;
+  final List<CutRange> keptRanges;
   final ApiErrorInfo? error;
   final List<EditRevision> versions;
   final DateTime createdAt;
@@ -235,6 +260,8 @@ class EditJob {
     required this.outputUrl,
     required this.thumbnailUrl,
     required this.warnings,
+    required this.insights,
+    required this.keptRanges,
     required this.error,
     required this.versions,
     required this.createdAt,
@@ -268,6 +295,16 @@ class EditJob {
         if (j['warnings'] is List)
           for (final w in (j['warnings'] as List))
             if (w is String) w,
+      ],
+      insights: {
+        if (j['insights'] is Map)
+          for (final e in (j['insights'] as Map).entries)
+            if (e.value is num || e.value is bool) e.key.toString(): e.value as Object,
+      },
+      keptRanges: [
+        if (j['kept_ranges'] is List)
+          for (final r in (j['kept_ranges'] as List))
+            if (r is Map) CutRange.fromJson(Map<String, dynamic>.from(r)),
       ],
       error: j['error'] is Map ? ApiErrorInfo.fromJson(Map<String, dynamic>.from(j['error'] as Map)) : null,
       versions: [

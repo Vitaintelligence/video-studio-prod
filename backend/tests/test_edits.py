@@ -188,6 +188,39 @@ def test_revision_requires_completed_edit_and_variant_limits(client, upload_asse
     assert client.post(f"/v1/edits/{eid}/variants", json={"count": 5}).status_code in (422, 429)  # per-edit / active caps
 
 
+def test_restore_range_creates_idempotent_revision(client, upload_asset):
+    from server.db.models import Generation
+    from server.db.session import get_sessionmaker
+
+    asset = upload_asset()
+    eid = _create(client, [asset["id"]]).json()["id"]
+    with get_sessionmaker()() as session:
+        root = session.get(Generation, uuid.UUID(eid))
+        root.status = "completed"
+        session.commit()
+
+    bad = client.post(f"/v1/edits/{eid}/restore", json={"source": 0, "start": 4.0, "end": 3.0})
+    assert bad.status_code == 422
+    body = {"source": 0, "start": 4.0, "end": 6.25}
+    restored = client.post(f"/v1/edits/{eid}/restore", json=body, headers={"Idempotency-Key": "restore-1"})
+    assert restored.status_code == 202
+    replay = client.post(f"/v1/edits/{eid}/restore", json=body, headers={"Idempotency-Key": "restore-1"})
+    assert replay.headers["idempotent-replay"] == "true" and replay.json()["id"] == restored.json()["id"]
+    with get_sessionmaker()() as session:
+        revision = session.get(Generation, uuid.UUID(restored.json()["id"]))
+        assert revision.kind == "revision" and revision.revision_number == 2
+        assert revision.meta["restore_ranges"] == [body]
+
+
+def test_restored_ranges_are_merged_into_the_source_timeline():
+    merged = LocalEditRuntime._merge_ranges(
+        [{"source": 0, "start": 2.0, "end": 4.0}, {"source": 0, "start": 8.0, "end": 10.0}],
+        [{"source": 0, "start": 3.5, "end": 8.5}],
+        1,
+    )
+    assert merged == [{"source": 0, "start": 2.0, "end": 10.0}]
+
+
 # ----------------------------------------------------------------------------- REAL deterministic editing
 @needs_ffmpeg
 def test_first_product_test_upload_edit_poll_output_playback(client, upload_asset, real_engine):

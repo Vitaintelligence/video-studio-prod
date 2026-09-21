@@ -97,6 +97,8 @@ class EditController extends Notifier<EditState> {
   String _watchedId = '';
   String? _instructionKey;
   String? _instructionText;
+  String? _restoreKey;
+  CutRange? _restoreRange;
 
   @override
   EditState build() {
@@ -155,6 +157,29 @@ class EditController extends Notifier<EditState> {
       final accepted = await ref.read(apiProvider).addInstruction(editId, text, idempotencyKey: _instructionKey!);
       _instructionKey = null;
       _instructionText = null;
+      _watchedId = accepted.id;
+      state = state.copyWith(isSendingInstruction: false, clearSelection: true);
+      _poller.start();
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(isSendingInstruction: false, instructionError: e);
+      return false;
+    }
+  }
+
+  Future<bool> restoreRange(CutRange range) async {
+    if (state.isSendingInstruction || state.isProcessing) return false;
+    state = state.copyWith(isSendingInstruction: true, clearInstructionError: true);
+    final same =
+        _restoreRange?.source == range.source && _restoreRange?.start == range.start && _restoreRange?.end == range.end;
+    if (!same || _restoreKey == null) {
+      _restoreRange = range;
+      _restoreKey = _uuid.v4();
+    }
+    try {
+      final accepted = await ref.read(apiProvider).restoreRange(editId, range, idempotencyKey: _restoreKey!);
+      _restoreKey = null;
+      _restoreRange = null;
       _watchedId = accepted.id;
       state = state.copyWith(isSendingInstruction: false, clearSelection: true);
       _poller.start();

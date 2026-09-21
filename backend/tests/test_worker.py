@@ -78,6 +78,18 @@ def test_worker_success_uploads_validates_and_completes(env):
     assert (project / "checkpoint_compose.json").exists()  # debug JSON kept
 
 
+def test_worker_persists_runtime_cut_ranges(env):
+    gid = _new(env)
+
+    def render_with_cut_map(ctx: JobContext) -> RuntimeResult:
+        result = MockRuntime(0.0).run_generation(ctx)
+        result.kept_ranges = [{"start": 0.0, "end": 0.6}]
+        return result
+
+    assert _run(env, gid, ScriptedRuntime(render_with_cut_map)) == "completed"
+    assert _get(gid).meta["kept_ranges"] == [{"start": 0.0, "end": 0.6}]
+
+
 def test_progress_persisted_from_checkpoints_during_run(env):
     gid = _new(env)
     seen = []

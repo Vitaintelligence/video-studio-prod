@@ -118,6 +118,9 @@ void main() {
       await pumpApp(tester, h);
       await settle(tester, steps: 3);
 
+      expect(find.text('Turn messy footage into a tighter ad.'), findsOneWidget);
+      await tester.tap(find.text('Show me my time savings'));
+      await settle(tester, steps: 5);
       expect(find.text('What best describes you?'), findsOneWidget);
       await tester.tap(find.text('UGC creator'));
       await settle(tester, steps: 5);
@@ -261,13 +264,10 @@ void main() {
       expect(find.text('1:17'), findsOneWidget);
       expect(find.text('0:17'), findsOneWidget);
       expect(find.text('1m saved'), findsOneWidget);
-      expect(find.text('Use this cut'), findsOneWidget);
+      expect(find.text('Save to Photos'), findsOneWidget);
+      expect(find.text('Share'), findsOneWidget);
       expect(find.text('Adjust'), findsOneWidget);
       expect(find.text('Create variants'), findsOneWidget);
-      await tester.tap(find.text('Use this cut'));
-      await settle(tester, steps: 5);
-      expect(find.text('Save to Photos'), findsOneWidget);
-      expect(find.text('Share…'), findsOneWidget);
       await tester.tap(find.text('Save to Photos'));
       await settle(tester, steps: 5);
       expect(h.exporter.exported, [FakeBackend.outputUrl]);
@@ -321,7 +321,8 @@ void main() {
       );
       await pumpApp(tester, h, location: '/edits/edit-1');
       await settle(tester, steps: 4);
-      expect(find.text('Use this cut'), findsOneWidget);
+      expect(find.text('Save to Photos'), findsOneWidget);
+      expect(find.text('Share'), findsOneWidget);
       expect(find.text('Adjust'), findsNothing);
       expect(find.text('Create variants'), findsNothing);
       await unmount(tester);

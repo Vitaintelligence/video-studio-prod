@@ -126,6 +126,15 @@ class AdCutApi {
         ),
       );
 
+  Future<EditAccepted> restoreRange(String editId, CutRange range, {required String idempotencyKey}) async =>
+      EditAccepted.fromJson(
+        await client.postJson(
+          '/v1/edits/$editId/restore',
+          idempotencyKey: idempotencyKey,
+          body: {'source': range.source, 'start': range.start, 'end': range.end},
+        ),
+      );
+
   Future<List<EditJob>> createVariants(
     String editId, {
     int count = 3,

@@ -13,6 +13,7 @@ class FakeBackend {
   final List<http.BaseRequest> requests = [];
   final List<Map<String, dynamic>> editBodies = [];
   final List<Map<String, dynamic>> instructionBodies = [];
+  final List<Map<String, dynamic>> restoreBodies = [];
   final List<String> uploadAuthHeaders = [];
   int editCreations = 0;
   int getEditCalls = 0;
@@ -78,6 +79,8 @@ class FakeBackend {
       'output_url': done ? outputUrl : null,
       'thumbnail_url': done ? 'https://cdn.test/generations/thumb.jpg' : null,
       'warnings': e['warnings'] ?? <String>[],
+      'insights': e['insights'] ?? <String, dynamic>{},
+      'kept_ranges': e['kept_ranges'] ?? <Map<String, dynamic>>[],
       'error': e['error'],
       'versions': _versionsOf(e),
       'created_at': '2025-09-20T10:00:00Z',
@@ -99,6 +102,7 @@ class FakeBackend {
         'progress': done ? 100 : x['progress'],
         'output_url': done ? outputUrl : null,
         'thumbnail_url': null,
+        'kept_ranges': x['kept_ranges'] ?? <Map<String, dynamic>>[],
         'created_at': '2025-09-20T10:00:00Z',
       };
     }
@@ -117,6 +121,7 @@ class FakeBackend {
     String? parent,
     int? version,
     Map<String, dynamic>? variant,
+    List<Map<String, dynamic>>? keptRanges,
   }) {
     final id = 'edit-${edits.length + 1}';
     final e = {
@@ -131,6 +136,12 @@ class FakeBackend {
       'display_stage': null,
       'instruction': instruction,
       'variant': variant,
+      'kept_ranges':
+          keptRanges ??
+          [
+            {'source': 0, 'start': 2.0, 'end': 8.0},
+            {'source': 0, 'start': 12.0, 'end': 23.0},
+          ],
       'steps': 0,
     };
     edits[id] = e;
@@ -282,6 +293,34 @@ class FakeBackend {
         'status': 'queued',
         'progress': 0,
         'poll_url': '/v1/edits/${r['id']}',
+      });
+    }
+    final restore = RegExp(r'^/v1/edits/([^/]+)/restore$').firstMatch(path);
+    if (m == 'POST' && restore != null) {
+      final root = edits[restore.group(1)]!;
+      if (root['status'] != 'completed') {
+        return _err(409, 'INVALID_REQUEST', 'Wait for this version to finish before restoring footage.');
+      }
+      final body = j();
+      restoreBodies.add(body);
+      final ranges = [
+        for (final range in (root['kept_ranges'] as List)) Map<String, dynamic>.from(range as Map),
+        Map<String, dynamic>.from(body),
+      ];
+      final n = edits.values.where((x) => x['parent_id'] == root['id'] && x['kind'] == 'revision').length + 2;
+      final revision = _newEdit(
+        'revision',
+        'Restore removed footage',
+        parent: root['id'] as String,
+        version: n,
+        keptRanges: ranges,
+      );
+      return _json(202, {
+        'id': revision['id'],
+        'project_id': 'proj-1',
+        'status': 'queued',
+        'progress': 0,
+        'poll_url': '/v1/edits/${revision['id']}',
       });
     }
     final vars = RegExp(r'^/v1/edits/([^/]+)/variants$').firstMatch(path);

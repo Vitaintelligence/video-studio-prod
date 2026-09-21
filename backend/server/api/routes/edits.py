@@ -18,7 +18,15 @@ from server.api.dependencies import (
 )
 from server.core.errors import AppError, ErrorCode
 from server.core.security import Principal
-from server.schemas.edit import EditAccepted, EditCreate, EditList, EditOut, InstructionCreate, VariantsCreate
+from server.schemas.edit import (
+    EditAccepted,
+    EditCreate,
+    EditList,
+    EditOut,
+    InstructionCreate,
+    RestoreRangeCreate,
+    VariantsCreate,
+)
 from server.services import edit_service as es
 from server.services import generation_service as gsvc
 from server.services.capabilities import read_snapshot
@@ -101,6 +109,23 @@ def add_instruction(edit_id: uuid.UUID, body: InstructionCreate, response: Respo
     _require_editing(redis_client)
     gen, created = es.create_revision(session, edit_id, body.instruction, user_id=principal.user_id,
                                       idempotency_key=idempotency_key, settings=settings)
+    if not created:
+        response.headers["Idempotent-Replay"] = "true"
+        return _accepted(gen)
+    _enqueue(session, enqueue, gen)
+    return _accepted(gen)
+
+
+@router.post("/{edit_id}/restore", status_code=202, response_model=EditAccepted)
+def restore_range(edit_id: uuid.UUID, body: RestoreRangeCreate, response: Response,
+                  principal: Principal = Depends(get_principal), session=Depends(get_db), settings=Depends(get_settings_dep),
+                  limiter=Depends(get_rate_limiter_dep), redis_client=Depends(get_redis_dep), enqueue=Depends(get_enqueue),
+                  idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None):
+    _idem(idempotency_key)
+    limiter.hit("generations", principal.user_id, settings.rate_limit_generations_per_minute)
+    _require_editing(redis_client)
+    gen, created = es.create_restore_revision(session, edit_id, body.model_dump(), user_id=principal.user_id,
+                                               idempotency_key=idempotency_key, settings=settings)
     if not created:
         response.headers["Idempotent-Replay"] = "true"
         return _accepted(gen)

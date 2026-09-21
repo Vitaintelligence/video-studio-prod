@@ -150,6 +150,7 @@ def _execute(
         kind=gen.kind, source_files=source_files, platform=gen.platform, cta_text=meta0.get("cta_text"),
         variant_label=gen.variant_label, hook_text=meta0.get("hook_text"),
         duration_explicit=bool(meta0.get("duration_explicit", True)),
+        restore_ranges=list(meta0.get("restore_ranges", [])),
     )
     # The chosen runtime may report a different stage vocabulary (e.g. the deterministic editor).
     stages = runtime.plan_stages(ctx) or stages
@@ -158,6 +159,7 @@ def _execute(
     llm_cost = 0.0
     warnings: list[str] = []
     insights: dict = {}
+    kept_ranges: list[dict] = list(meta0.get("kept_ranges", []))
 
     def poll() -> Abort | None:
         try:
@@ -187,6 +189,7 @@ def _execute(
             llm_cost = result.llm_cost_usd or 0.0
             warnings = list(result.warnings)
             insights = dict(result.insights)
+            kept_ranges = list(result.kept_ranges)
             log.info("runtime_finished", status=result.status, turns=result.turns,
                      elapsed_ms=int((time.monotonic() - started) * 1000), detail=sanitize_text(result.detail, 400))
 
@@ -242,7 +245,7 @@ def _execute(
                     "width": probe.width, "height": probe.height,
                 },
                 "provider_cost_usd": provider_spend, "llm_cost_usd": round(llm_cost, 4),
-                "warnings": warnings, "insights": insights,
+                "warnings": warnings, "insights": insights, "kept_ranges": kept_ranges,
             },
         )
         est = _estimated_cost(project_dir)

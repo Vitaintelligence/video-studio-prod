@@ -46,6 +46,7 @@ class JobContext:
     variant_label: str | None = None
     hook_text: str | None = None
     duration_explicit: bool = True  # False => duration_seconds is only a default, not a client target
+    restore_ranges: list[dict] = field(default_factory=list)
 
 
 RuntimeStatus = Literal["completed", "aborted", "failed", "timeout"]
@@ -62,6 +63,7 @@ class RuntimeResult:
     provider: str = ""
     warnings: list[str] = field(default_factory=list)  # safe, machine-readable codes only
     insights: dict = field(default_factory=dict)  # safe summary numbers for the client (e.g. retakes removed)
+    kept_ranges: list[dict] = field(default_factory=list)  # source-relative ranges used in the rendered cut
 
 
 class RuntimeOrchestrator(ABC):

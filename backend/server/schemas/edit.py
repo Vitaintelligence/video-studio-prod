@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from server.schemas.generation import AspectRatio, GenerationError, StatusLiteral
 
@@ -43,6 +43,22 @@ class AssetOut(BaseModel):
     created_at: datetime
 
 
+class CutRange(BaseModel):
+    source: int = Field(ge=0, le=9)
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _ordered(self):
+        if self.end <= self.start:
+            raise ValueError("end must be after start")
+        return self
+
+
+class RestoreRangeCreate(CutRange):
+    model_config = ConfigDict(extra="forbid")
+
+
 class VersionOut(BaseModel):
     """One version of an edit: the original (version 1) or a prompt-to-edit revision."""
 
@@ -53,6 +69,7 @@ class VersionOut(BaseModel):
     progress: int
     output_url: str | None = None
     thumbnail_url: str | None = None
+    kept_ranges: list[CutRange] = Field(default_factory=list)
     created_at: datetime
 
 
@@ -129,6 +146,7 @@ class EditOut(BaseModel):
     thumbnail_url: str | None = None
     warnings: list[str] = Field(default_factory=list)
     insights: dict[str, float | int | bool] = Field(default_factory=dict)  # e.g. retakes_removed
+    kept_ranges: list[CutRange] = Field(default_factory=list)
     error: GenerationError | None = None
     versions: list[VersionOut] = Field(default_factory=list)
     created_at: datetime

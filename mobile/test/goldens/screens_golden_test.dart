@@ -71,9 +71,19 @@ void main() {
     await unmount(tester);
   });
 
+  testWidgets('onboarding · intro · standard', (tester) async {
+    final h = await Harness.create(prefs: {'onboarding.done': false});
+    await pumpApp(tester, h);
+    await settle(tester);
+    await shot(tester, 'onboarding_intro_standard');
+    await unmount(tester);
+  });
+
   testWidgets('onboarding · question · compact', (tester) async {
     final h = await Harness.create(prefs: {'onboarding.done': false});
     await pumpApp(tester, h, phone: Phone.compact);
+    await settle(tester);
+    await tester.tap(find.text('Show me my time savings'));
     await settle(tester);
     await shot(tester, 'onboarding_question_compact');
     await unmount(tester);
@@ -90,6 +100,8 @@ void main() {
       },
     );
     await pumpApp(tester, h);
+    await settle(tester);
+    await tester.tap(find.text('Show me my time savings'));
     await settle(tester);
     for (final answer in ['UGC creator', 'Beauty', '6–15', '30–60 min']) {
       await tester.tap(find.text(answer));

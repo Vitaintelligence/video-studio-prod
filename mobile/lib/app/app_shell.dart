@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/design/app_colors.dart';
+import '../core/design/app_motion.dart';
 import '../core/design/app_radius.dart';
 import '../core/design/app_spacing.dart';
+import '../core/widgets/press_scale.dart';
 import 'active_work_bar.dart';
 import 'routes.dart';
 
@@ -88,8 +90,7 @@ class _CameraAction extends StatelessWidget {
         label: 'Record',
         excludeSemantics: true,
         onTap: open,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: PressScale(
           onTap: open,
           child: Center(
             child: Container(
@@ -130,22 +131,31 @@ class _NavItem extends StatelessWidget {
         label: label,
         excludeSemantics: true,
         onTap: onTap,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: PressScale(
           onTap: () {
             HapticFeedback.selectionClick();
             onTap();
           },
           child: Center(
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: AppMotion.allowed(context, AppMotion.standard),
+              curve: AppMotion.enter,
               width: 50,
               height: 46,
               decoration: BoxDecoration(
                 color: selected ? AppColors.accentSoft : AppColors.surfaceRaised,
                 borderRadius: AppRadius.pillAll,
               ),
-              child: Icon(selected ? selectedIcon : icon, size: 21, color: color),
+              child: AnimatedSwitcher(
+                duration: AppMotion.allowed(context, AppMotion.standard),
+                switchInCurve: AppMotion.emphasis,
+                switchOutCurve: AppMotion.enter,
+                transitionBuilder: (child, animation) => ScaleTransition(
+                  scale: Tween<double>(begin: 0.72, end: 1).animate(animation),
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+                child: Icon(selected ? selectedIcon : icon, key: ValueKey(selected), size: 21, color: color),
+              ),
             ),
           ),
         ),

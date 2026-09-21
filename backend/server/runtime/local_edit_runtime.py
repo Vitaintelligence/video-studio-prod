@@ -109,6 +109,8 @@ class LocalEditRuntime(RuntimeOrchestrator):
             if isinstance(outcome, Abort):
                 return RuntimeResult("aborted", abort=outcome, provider=self.name)
             timeline, insights = outcome
+            if timeline is not None and ctx.restore_ranges:
+                timeline = self._merge_ranges(timeline, ctx.restore_ranges, len(ctx.source_files))
         _write_checkpoint(pdir, pid, pipe, "analyze", "completed", spent)
 
         # ---- deterministic timeline edit in a separate process
@@ -119,7 +121,30 @@ class LocalEditRuntime(RuntimeOrchestrator):
         }
         result = self._render(ctx, spec)
         result.insights = insights
+        result.kept_ranges = list(timeline or [])
         return result
+
+    @staticmethod
+    def _merge_ranges(timeline: list[dict], restores: list[dict], source_count: int) -> list[dict]:
+        """Add user-restored source ranges, then return a stable non-overlapping source timeline."""
+        valid: list[dict] = []
+        for item in [*timeline, *restores]:
+            try:
+                source = int(item["source"])
+                start = max(float(item["start"]), 0.0)
+                end = float(item["end"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if 0 <= source < source_count and end > start:
+                valid.append({"source": source, "start": round(start, 3), "end": round(end, 3)})
+        valid.sort(key=lambda r: (r["source"], r["start"], r["end"]))
+        merged: list[dict] = []
+        for item in valid:
+            if merged and item["source"] == merged[-1]["source"] and item["start"] <= merged[-1]["end"] + 0.02:
+                merged[-1]["end"] = round(max(merged[-1]["end"], item["end"]), 3)
+            else:
+                merged.append(dict(item))
+        return merged
 
     # ------------------------------------------------------------------------------------
     def _select_takes(self, ctx: JobContext, plan: EditPlan, warnings: list[str]):

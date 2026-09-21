@@ -2,6 +2,9 @@ import 'dart:io';
 
 import 'package:adcut_mobile/features/camera/camera_controller.dart';
 import 'package:adcut_mobile/features/clean/clean_controller.dart';
+import 'package:adcut_mobile/core/models/api_models.dart';
+import 'package:adcut_mobile/features/edit/cut_timeline.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/app_pump.dart';
@@ -72,6 +75,42 @@ void main() {
   });
 
   group('raw vs cut', () {
+    test('cut timeline derives the real removed gaps from kept source ranges', () {
+      final slices = buildCutSlices(20, const [
+        CutRange(source: 0, start: 2, end: 7),
+        CutRange(source: 0, start: 10, end: 18),
+      ]);
+      expect(slices.map((slice) => slice.kept), [false, true, false, true, false]);
+      expect(slices.where((slice) => !slice.kept).map((slice) => slice.range.duration), [2, 3, 2]);
+    });
+
+    testWidgets('a removed range can be reviewed and restored as a new version', (tester) async {
+      final h = await Harness.create(prefs: {'raw_seconds.edit-1': 30.0});
+      h.backend.assets['asset-1'] = {'id': 'asset-1', 'status': 'uploaded'};
+      h.backend.newEditForTest('Remove awkward pauses.');
+      h.backend.edits['edit-1']!['status'] = 'completed';
+      await pumpApp(tester, h, location: '/edits/edit-1');
+      await settle(tester);
+
+      expect(find.text('What AdCut changed'), findsOneWidget);
+      final removedClip = find.bySemanticsLabel(RegExp('Preview removed clip')).first;
+      await tester.ensureVisible(removedClip);
+      await tester.drag(find.byType(ListView).first, const Offset(0, -240));
+      await tester.pumpAndSettle();
+      await tester.tap(removedClip);
+      await settle(tester, steps: 3);
+      expect(find.text('Restore this clip'), findsOneWidget);
+      await tester.ensureVisible(find.text('Restore this clip'));
+      await tester.drag(find.byType(ListView).first, const Offset(0, -320));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Restore this clip'));
+      await settle(tester, steps: 8);
+
+      expect(h.backend.restoreBodies, hasLength(1));
+      expect(h.backend.restoreBodies.single['source'], 0);
+      await unmount(tester);
+    });
+
     testWidgets('the toggle appears only when the raw recording is still on the device', (tester) async {
       final raw = await tester.runAsync(() => tempVideo('raw.mp4'));
       final h = await Harness.create(prefs: {'raw_path.edit-1': raw!, 'raw_seconds.edit-1': 77.0});

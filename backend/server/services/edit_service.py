@@ -217,6 +217,60 @@ def create_revision(session: Session, edit_id: uuid.UUID, instruction: str, *, u
     return _persist(session, gen, scoped_key, fp)
 
 
+def create_restore_revision(session: Session, edit_id: uuid.UUID, restored: dict, *, user_id: str,
+                            idempotency_key: str | None, settings: Settings) -> tuple[Generation, bool]:
+    """Create a new edit version with one previously removed source range restored."""
+    target = get_edit(session, edit_id, user_id)
+    if target.kind == "variant":
+        raise AppError(ErrorCode.INVALID_REQUEST, "Variant footage cannot be restored here.", 422)
+    root = _root_of(session, target)
+    scoped_key = f"{user_id}:{idempotency_key}" if idempotency_key else None
+    normalized = {
+        "source": int(restored["source"]),
+        "start": round(float(restored["start"]), 3),
+        "end": round(float(restored["end"]), 3),
+    }
+    fp = fingerprint_obj({"edit": str(root.id), "restore": normalized})
+    existing = _existing_by_key(session, scoped_key)
+    if existing:
+        return _replay(existing, fp), False
+    if target.status != S.completed.value:
+        raise AppError(ErrorCode.INVALID_REQUEST, "Wait for this version to finish before restoring footage.", 409)
+    _guard(session, user_id)
+
+    prior = list(session.scalars(select(Generation).where(
+        Generation.parent_id == root.id, Generation.kind == "revision").order_by(Generation.revision_number)))
+    restore_ranges: list[dict] = []
+    for row in [root, *prior]:
+        for item in (row.meta or {}).get("restore_ranges", []):
+            if isinstance(item, dict) and {"source", "start", "end"}.issubset(item):
+                restore_ranges.append({
+                    "source": int(item["source"]),
+                    "start": float(item["start"]),
+                    "end": float(item["end"]),
+                })
+    if normalized not in restore_ranges:
+        restore_ranges.append(normalized)
+
+    last = max([row.revision_number or 1 for row in [root, *prior]], default=1)
+    gen = Generation(
+        id=uuid.uuid4(), user_id=user_id, idempotency_key=scoped_key, prompt="Restore removed footage",
+        pipeline=root.pipeline, status=S.queued.value, progress=0,
+        duration_seconds_requested=root.duration_seconds_requested, aspect_ratio=root.aspect_ratio, style=None,
+        voice_enabled=True, captions_enabled=True, quality_profile="standard",
+        runtime_provider=settings.orchestrator_provider, kind="revision", project_id=root.project_id,
+        parent_id=root.id, revision_number=last + 1, platform=root.platform,
+        meta={
+            "request_fingerprint": fp,
+            "asset_ids": (root.meta or {}).get("asset_ids", []),
+            "cta_text": (root.meta or {}).get("cta_text"),
+            "duration_explicit": (root.meta or {}).get("duration_explicit", False),
+            "restore_ranges": restore_ranges,
+        },
+    )
+    return _persist(session, gen, scoped_key, fp)
+
+
 def create_variants(session: Session, edit_id: uuid.UUID, count: int, strategy: str, *, user_id: str,
                     idempotency_key: str | None, settings: Settings) -> tuple[list[Generation], bool]:
     target = get_edit(session, edit_id, user_id)
@@ -319,6 +373,7 @@ def _version_out(g: Generation, storage: StorageService) -> VersionOut:
         progress=100 if done else g.progress,
         output_url=storage.url_for(g.output_storage_key) if done and g.output_storage_key else None,
         thumbnail_url=storage.url_for(g.thumbnail_storage_key) if done and g.thumbnail_storage_key else None,
+        kept_ranges=(g.meta or {}).get("kept_ranges", []),
         created_at=_aware(g.created_at))
 
 
@@ -348,6 +403,7 @@ def edit_out(session: Session, gen: Generation, storage: StorageService, *, with
         thumbnail_url=storage.url_for(gen.thumbnail_storage_key) if done and gen.thumbnail_storage_key else None,
         warnings=[w for w in meta.get("warnings", []) if isinstance(w, str)][:10],
         insights={k: v for k, v in (meta.get("insights") or {}).items() if isinstance(v, (int, float, bool))},
+        kept_ranges=meta.get("kept_ranges", []),
         error=error, versions=versions,
         created_at=_aware(gen.created_at), started_at=_aware(gen.started_at), completed_at=_aware(gen.completed_at),
         updated_at=_aware(gen.updated_at),

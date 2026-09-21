@@ -132,9 +132,9 @@ def test_no_unrestricted_agent_endpoints(client):
     assert set(schema["paths"]) == {
         "/health", "/ready", "/v1/auth/device-session", "/v1/capabilities", "/v1/generations", "/v1/generations/{generation_id}",
         "/v1/generations/{generation_id}/cancel", "/v1/uploads/presign", "/v1/uploads/{asset_id}/complete",
-        "/v1/projects", "/v1/projects/{project_id}", "/v1/edits", "/v1/edits/{edit_id}", "/v1/edits/{edit_id}/cancel",
-        "/v1/edits/{edit_id}/instructions", "/v1/edits/{edit_id}/variants",
-    }
+            "/v1/projects", "/v1/projects/{project_id}", "/v1/edits", "/v1/edits/{edit_id}", "/v1/edits/{edit_id}/cancel",
+            "/v1/edits/{edit_id}/instructions", "/v1/edits/{edit_id}/restore", "/v1/edits/{edit_id}/variants",
+        }
 
 
 # -- creation ----------------------------------------------------------------
