@@ -68,7 +68,7 @@ See [.env.example](.env.example) (provider variables are copied verbatim from up
 - The container fallback is SQLite at `/workspace/storage/dev.db`; its parent directory is created automatically. This is
   useful for a single-container trial or an attached volume, but API + worker deployments must share Postgres by setting
   `DATABASE_URL` on both services.
-- Production requires `DEV_API_TOKEN` (>= 24 chars); the app refuses to start otherwise.
+- Production `AUTH_MODE=device_session` requires `DEVICE_AUTH_SECRET` (>= 32 chars). The mobile app exchanges a random per-install UUID for a signed anonymous session; no backend secret is shipped in the APK. `AUTH_MODE=dev_token` remains available for local development and requires `DEV_API_TOKEN` (>= 24 chars).
 - `STORAGE_BACKEND=r2` needs `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. With
   `R2_PUBLIC_BASE_URL` set, URLs are public/CDN; without it they are signed and expire after `SIGNED_URL_TTL_SECONDS`.
   The DB stores object **keys**; URLs are derived at read time.
@@ -76,7 +76,7 @@ See [.env.example](.env.example) (provider variables are copied verbatim from up
 
 | Service | needs |
 |---|---|
-| api | `APP_ENV`, `AUTH_MODE`, `DEV_API_TOKEN`, `DATABASE_URL`, `REDIS_URL`, (R2 vars if presigning uploads / signed URLs) |
+| api | `APP_ENV`, `AUTH_MODE`, `DEVICE_AUTH_SECRET` (or `DEV_API_TOKEN` locally), `DATABASE_URL`, `REDIS_URL`, (R2 vars if presigning uploads / signed URLs) |
 | worker | `APP_ENV`, `DATABASE_URL`, `REDIS_URL`, `ORCHESTRATOR_PROVIDER`, `ANTHROPIC_API_KEY`, `MAX_JOB_BUDGET_USD`, R2 vars, provider keys |
 
 `/v1/capabilities` is computed by the **worker** from the real OpenMontage registry (`discover()` +

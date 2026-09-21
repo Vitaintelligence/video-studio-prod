@@ -43,8 +43,10 @@ class Settings(BaseSettings):
     max_body_bytes: int = 64 * 1024
 
     # --- auth --------------------------------------------------------------
-    auth_mode: Literal["dev_token"] = "dev_token"
+    auth_mode: Literal["dev_token", "device_session"] = "dev_token"
     dev_api_token: SecretStr | None = None
+    device_auth_secret: SecretStr | None = None
+    device_session_ttl_seconds: int = 365 * 24 * 60 * 60
 
     # --- data stores -------------------------------------------------------
     database_url: str = "sqlite+pysqlite:///./dev.db"
@@ -161,11 +163,18 @@ class Settings(BaseSettings):
             if missing:
                 raise ValueError(f"STORAGE_BACKEND={self.storage_backend} requires {', '.join(missing)} (R2_* names also accepted)")
         if self.is_production:
-            token = self.dev_api_token.get_secret_value() if self.dev_api_token else ""
-            if len(token) < 24:
-                raise ValueError(
-                    "production requires DEV_API_TOKEN (>= 24 chars) while AUTH_MODE=dev_token"
-                )
+            if self.auth_mode == "dev_token":
+                token = self.dev_api_token.get_secret_value() if self.dev_api_token else ""
+                if len(token) < 24:
+                    raise ValueError(
+                        "production requires DEV_API_TOKEN (>= 24 chars) while AUTH_MODE=dev_token"
+                    )
+            else:
+                secret = self.device_auth_secret.get_secret_value() if self.device_auth_secret else ""
+                if len(secret) < 32:
+                    raise ValueError(
+                        "production requires DEVICE_AUTH_SECRET (>= 32 chars) while AUTH_MODE=device_session"
+                    )
             if self.storage_backend == "local":
                 # Allowed (e.g. a volume) but loudly discouraged; see README.
                 pass
@@ -188,6 +197,10 @@ class Settings(BaseSettings):
     @property
     def dev_token_value(self) -> str | None:
         return self.dev_api_token.get_secret_value() if self.dev_api_token else None
+
+    @property
+    def device_auth_secret_value(self) -> str | None:
+        return self.device_auth_secret.get_secret_value() if self.device_auth_secret else None
 
 
 @lru_cache

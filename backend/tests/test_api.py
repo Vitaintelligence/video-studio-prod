@@ -49,6 +49,28 @@ def test_auth_required_for_v1(client):
     assert client.get("/v1/generations", headers={"Authorization": f"Bearer {TEST_TOKEN}"}).status_code == 200
 
 
+def test_device_session_authenticates_one_install(env, fake_redis, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from server.api.main import create_app
+    from server.core.config import Settings
+    from server.services.ratelimit import RateLimiter
+
+    monkeypatch.setenv("AUTH_MODE", "device_session")
+    monkeypatch.setenv("DEVICE_AUTH_SECRET", "device-session-test-secret-0123456789abcdef")
+    settings = Settings(_env_file=None)
+    app = create_app(settings)
+    app.state.get_rate_limiter = lambda: RateLimiter(fake_redis)
+    with TestClient(app) as c:
+        install_id = str(uuid.uuid4())
+        issued = c.post("/v1/auth/device-session", json={"install_id": install_id})
+        assert issued.status_code == 200
+        token = issued.json()["access_token"]
+        assert issued.json()["token_type"] == "bearer"
+        assert c.get("/v1/generations", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+        assert c.get("/v1/generations", headers={"Authorization": f"Bearer {token}x"}).status_code == 401
+
+
 def test_production_requires_strong_token(env, monkeypatch):
     import pytest
 
@@ -77,7 +99,7 @@ def test_no_unrestricted_agent_endpoints(client):
     for path in schema["paths"]:
         assert not any(word in path.lower() for word in forbidden), path
     assert set(schema["paths"]) == {
-        "/health", "/ready", "/v1/capabilities", "/v1/generations", "/v1/generations/{generation_id}",
+        "/health", "/ready", "/v1/auth/device-session", "/v1/capabilities", "/v1/generations", "/v1/generations/{generation_id}",
         "/v1/generations/{generation_id}/cancel", "/v1/uploads/presign", "/v1/uploads/{asset_id}/complete",
         "/v1/projects", "/v1/projects/{project_id}", "/v1/edits", "/v1/edits/{edit_id}", "/v1/edits/{edit_id}/cancel",
         "/v1/edits/{edit_id}/instructions", "/v1/edits/{edit_id}/variants",

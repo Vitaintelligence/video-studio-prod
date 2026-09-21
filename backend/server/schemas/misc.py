@@ -51,6 +51,18 @@ class ReadyOut(BaseModel):
     checks: dict[str, str]
 
 
+class DeviceSessionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    install_id: uuid.UUID
+
+
+class DeviceSessionResponse(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int
+
+
 class CapabilitiesOut(BaseModel):
     status: str
     generation_available: bool
