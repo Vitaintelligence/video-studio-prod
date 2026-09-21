@@ -68,6 +68,13 @@ def test_device_session_authenticates_one_install(env, fake_redis, monkeypatch):
         token = issued.json()["access_token"]
         assert issued.json()["token_type"] == "bearer"
         assert c.get("/v1/generations", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+        presign = c.post(
+            "/v1/uploads/presign",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"filename": "ios clip.mov", "content_type": "video/quicktime", "purpose": "source_video", "size_bytes": 10},
+        )
+        assert presign.status_code == 200
+        assert presign.json()["key"].startswith("uploads/device_")
         assert c.get("/v1/generations", headers={"Authorization": f"Bearer {token}x"}).status_code == 401
 
 

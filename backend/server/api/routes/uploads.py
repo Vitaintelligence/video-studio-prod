@@ -58,7 +58,11 @@ def presign_upload(
 
     asset_id = uuid.uuid4()
     filename = sanitize_filename(body.filename)
-    key = validate_key(f"uploads/{principal.user_id}/{asset_id.hex}/{filename}")
+    # Auth subjects are database identifiers, not object-key path segments.
+    # Device sessions deliberately use a namespaced subject (``device:...``),
+    # so normalize it before constructing the strictly validated storage key.
+    owner_key = sanitize_filename(principal.user_id, default="user")
+    key = validate_key(f"uploads/{owner_key}/{asset_id.hex}/{filename}")
     session.add(Asset(id=asset_id, user_id=principal.user_id, project_id=body.project_id, filename=filename,
                       content_type=content_type, purpose=body.purpose, storage_key=key, status="pending"))
     session.commit()
