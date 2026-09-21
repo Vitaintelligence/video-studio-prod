@@ -22,7 +22,9 @@ class UploadCancelToken {
 class ApiClient {
   final http.Client _http;
   final Uri _base;
-  final String? _token;
+  String? _token;
+  final Future<String?> Function()? _refreshToken;
+  Future<String?>? _refreshingToken;
   final Duration timeout;
   final bool debugLog;
 
@@ -30,11 +32,13 @@ class ApiClient {
     http.Client? httpClient,
     String? baseUrl,
     String? token,
+    Future<String?> Function()? refreshToken,
     this.timeout = ApiConfig.requestTimeout,
     bool? debugLog,
   }) : _http = httpClient ?? http.Client(),
        _base = Uri.parse(baseUrl ?? ApiConfig.baseUrl),
        _token = (token ?? ApiConfig.devToken).isEmpty ? null : (token ?? ApiConfig.devToken),
+       _refreshToken = refreshToken,
        debugLog = debugLog ?? kDebugMode;
 
   String get baseUrl => _base.toString();
@@ -70,6 +74,7 @@ class ApiClient {
     Map<String, String>? query,
     Object? body,
     String? idempotencyKey,
+    bool refreshOnUnauthorized = true,
   }) async {
     final uri = _uri(path, query);
     final sw = Stopwatch()..start();
@@ -80,6 +85,20 @@ class ApiClient {
       final streamed = await _http.send(req).timeout(timeout);
       final resp = await http.Response.fromStream(streamed).timeout(timeout);
       _log('$method $path -> ${resp.statusCode} (${sw.elapsedMilliseconds} ms)');
+      if (resp.statusCode == 401 && refreshOnUnauthorized && _refreshToken != null) {
+        final refreshed = await _refreshAuthToken();
+        if (refreshed != null && refreshed.isNotEmpty) {
+          _token = refreshed;
+          return _send(
+            method,
+            path,
+            query: query,
+            body: body,
+            idempotencyKey: idempotencyKey,
+            refreshOnUnauthorized: false,
+          );
+        }
+      }
       return _decode(resp);
     } on ApiException {
       rethrow;
@@ -98,6 +117,18 @@ class ApiClient {
         throw const ApiException.network();
       }
       rethrow;
+    }
+  }
+
+  Future<String?> _refreshAuthToken() async {
+    final active = _refreshingToken;
+    if (active != null) return active;
+    final operation = _refreshToken!();
+    _refreshingToken = operation;
+    try {
+      return await operation;
+    } finally {
+      if (identical(_refreshingToken, operation)) _refreshingToken = null;
     }
   }
 

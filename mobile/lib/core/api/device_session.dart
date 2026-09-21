@@ -41,6 +41,29 @@ abstract final class DeviceSession {
       await preferences.setString(_installIdKey, installId);
     }
 
+    return refresh(preferences, httpClient: httpClient, baseUrl: baseUrl, fallbackToken: fallbackToken, now: now);
+  }
+
+  /// Requests a fresh token even when a cached token has not expired.
+  /// Called after a protected endpoint returns 401, which also recovers from a
+  /// server signing-key rotation without requiring users to clear app data.
+  static Future<String?> refresh(
+    SharedPreferences preferences, {
+    http.Client? httpClient,
+    String baseUrl = ApiConfig.baseUrl,
+    String fallbackToken = ApiConfig.devToken,
+    DateTime Function()? now,
+  }) async {
+    final clock = now ?? DateTime.now;
+    final current = clock();
+    final cachedToken = preferences.getString(_tokenKey);
+    final cachedExpiry = preferences.getInt(_expiresAtKey);
+    var installId = preferences.getString(_installIdKey);
+    if (installId == null || installId.isEmpty) {
+      installId = const Uuid().v4();
+      await preferences.setString(_installIdKey, installId);
+    }
+
     final ownsClient = httpClient == null;
     final client = httpClient ?? http.Client();
     try {

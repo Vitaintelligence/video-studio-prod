@@ -65,4 +65,28 @@ void main() {
 
     expect(token, 'development-token');
   });
+
+  test('refresh replaces an unexpired cached token after server key rotation', () async {
+    final now = DateTime.utc(2026, 1, 1);
+    SharedPreferences.setMockInitialValues({
+      'auth.install_id': 'a6cb1b68-93e3-4b3f-9e5f-c6864ab6ae8b',
+      'auth.device_token': 'stale-token',
+      'auth.device_token_expires_at': now.add(const Duration(days: 30)).millisecondsSinceEpoch,
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final client = MockClient(
+      (_) async => http.Response(jsonEncode({'access_token': 'fresh-token', 'expires_in': 864000}), 200),
+    );
+
+    final token = await DeviceSession.refresh(
+      prefs,
+      httpClient: client,
+      baseUrl: 'https://api.test',
+      fallbackToken: '',
+      now: () => now,
+    );
+
+    expect(token, 'fresh-token');
+    expect(prefs.getString('auth.device_token'), 'fresh-token');
+  });
 }
