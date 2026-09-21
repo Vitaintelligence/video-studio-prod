@@ -133,10 +133,14 @@ class OpenRouterProvider:
 
     # -- chat / reasoning / vision -----------------------------------------------------
     def chat(self, messages: list[dict[str, Any]], *, model: str | None = None, vision: bool = False,
-             max_tokens: int = 800, temperature: float = 0.2) -> str:
+             max_tokens: int = 800, temperature: float = 0.2, thinking: bool = True) -> str:
+        """`thinking=False` asks reasoning-capable models not to spend the token budget on hidden reasoning
+        (otherwise a long deliberation can exhaust `max_tokens` and leave the visible answer empty)."""
         configured = self.settings.openrouter_vision_model if vision else self.settings.openrouter_reasoning_model
         chosen = self._model(model, configured, "vision" if vision else "reasoning")
-        body = {"model": chosen, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
+        body: dict[str, Any] = {"model": chosen, "messages": messages, "max_tokens": max_tokens, "temperature": temperature}
+        if not thinking:
+            body["reasoning"] = {"enabled": False}
         data = self._request("POST", "/chat/completions", json=body).json()
         try:
             return data["choices"][0]["message"]["content"] or ""

@@ -90,6 +90,16 @@ def test_chat_and_image():
     assert body["model"] == "vendor/img" and body["aspect_ratio"] == "9:16"
 
 
+def test_chat_can_switch_off_hidden_reasoning_so_it_cannot_eat_the_answer_budget():
+    """Regression (live): qwen3.7-plus reasoned for ~800 of 1200 tokens; longer clips returned an empty answer."""
+    p, fake = provider({("POST", "/api/v1/chat/completions"): httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})})
+    p.chat([{"role": "user", "content": "x"}])
+    assert "reasoning" not in json.loads(fake.calls[0].content)  # default request is unchanged
+    p.chat([{"role": "user", "content": "x"}], thinking=False, max_tokens=2000)
+    body = json.loads(fake.calls[1].content)
+    assert body["reasoning"] == {"enabled": False} and body["max_tokens"] == 2000
+
+
 def test_no_model_configured_is_a_controlled_error():
     p, _ = provider({}, openrouter_reasoning_model=None)
     with pytest.raises(ProviderError) as e:

@@ -66,7 +66,9 @@ def decide_takes(provider: OpenRouterProvider, model: str, view: dict[str, Any],
     try:
         text = provider.chat(
             [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}],
-            model=model, max_tokens=1200, temperature=0.0,
+            # Choosing among a handful of takes needs no extended reasoning; with it on, Qwen used ~800 of the old
+            # 1200-token budget on a 2-line clip, so a longer clip would have been cut off with an empty answer.
+            model=model, max_tokens=2000, temperature=0.0, thinking=False,
         )
     except ProviderError as exc:
         log.warning("take_llm_failed", code=exc.code)
