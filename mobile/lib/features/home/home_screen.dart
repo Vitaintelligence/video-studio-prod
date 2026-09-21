@@ -131,8 +131,9 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final capabilities = ref.watch(capabilitiesProvider);
     final persona = ref.watch(onboardingProvider.select((s) => s.persona));
-    final caps = ref.watch(capabilitiesProvider).value;
+    final caps = capabilities.value;
     final projects = ref.watch(projectsProvider).value ?? const <ApiProject>[];
     final unavailable = caps != null && !caps.editing;
     final intents = [
@@ -155,10 +156,10 @@ class HomeScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.floatingBarOffset),
           children: [
             SizedBox(
-              height: 56,
+              height: 64,
               child: Row(
                 children: [
-                  const Expanded(child: Text('AdCut', style: AppTypography.heading)),
+                  const Expanded(child: _Brand()),
                   AppIconButton(
                     icon: CupertinoIcons.person_crop_circle,
                     label: 'Account',
@@ -167,9 +168,22 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             const Text('What are you making today?', style: AppTypography.display),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Record or upload. AdCut handles the edit.',
+              style: AppTypography.bodySecondary.copyWith(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: AppSpacing.xl),
+            if (capabilities.hasError) ...[
+              _Notice(
+                icon: CupertinoIcons.wifi_slash,
+                message: 'Backend connection needs attention. Tap to retry.',
+                onTap: () => ref.invalidate(capabilitiesProvider),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
             if (unavailable)
               const _Notice(
                 icon: CupertinoIcons.exclamationmark_triangle_fill,
@@ -208,6 +222,30 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+class _Brand extends StatelessWidget {
+  const _Brand();
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    container: true,
+    header: true,
+    label: 'AdCut',
+    excludeSemantics: true,
+    child: Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: const BoxDecoration(color: AppColors.accentSoft, borderRadius: AppRadius.smallAll),
+          child: const Icon(CupertinoIcons.scissors, size: 17, color: AppColors.accentText),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        const Text('AdCut', style: AppTypography.heading),
+      ],
+    ),
+  );
+}
+
 class _PrimaryIntent extends StatelessWidget {
   const _PrimaryIntent({required this.info, required this.onTap});
 
@@ -227,7 +265,11 @@ class _PrimaryIntent extends StatelessWidget {
         onTap();
       },
       child: DecoratedBox(
-        decoration: const BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.largeAll),
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceRaised,
+          borderRadius: AppRadius.largeAll,
+          border: Border.fromBorderSide(BorderSide(color: AppColors.surfaceBorder)),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Row(
@@ -236,14 +278,32 @@ class _PrimaryIntent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(info.title, style: AppTypography.title.copyWith(color: AppColors.onAccent)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
+                      decoration: const BoxDecoration(color: AppColors.accentSoft, borderRadius: AppRadius.pillAll),
+                      child: Text(
+                        'ONE-TAP EDIT',
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.accentText,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(info.title, style: AppTypography.title),
                     const SizedBox(height: AppSpacing.xxs),
-                    Text(info.subtitle, style: AppTypography.bodySecondary.copyWith(color: AppColors.onAccent)),
+                    Text(info.subtitle, style: AppTypography.bodySecondary),
                   ],
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
-              Icon(info.icon, size: 32, color: AppColors.onAccent),
+              Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
+                child: Icon(info.icon, size: 25, color: AppColors.onAccent),
+              ),
             ],
           ),
         ),
@@ -270,12 +330,21 @@ class _IntentRow extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 64),
         child: DecoratedBox(
-          decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mediumAll),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.mediumAll,
+            border: Border.fromBorderSide(BorderSide(color: AppColors.surfaceBorder)),
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
             child: Row(
               children: [
-                Icon(info.icon, size: 24, color: AppColors.accentText),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(color: AppColors.accentSoft, borderRadius: AppRadius.smallAll),
+                  child: Icon(info.icon, size: 21, color: AppColors.accentText),
+                ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
@@ -329,25 +398,32 @@ class _SheetRow extends StatelessWidget {
 }
 
 class _Notice extends StatelessWidget {
-  const _Notice({required this.icon, required this.message});
+  const _Notice({required this.icon, required this.message, this.onTap});
 
   final IconData icon;
   final String message;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) => Semantics(
+    button: onTap != null,
     label: message,
     excludeSemantics: true,
-    child: DecoratedBox(
-      decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mediumAll),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: AppColors.warning),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(child: Text(message, style: AppTypography.body)),
-          ],
+    onTap: onTap,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mediumAll),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: AppColors.warning),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text(message, style: AppTypography.body)),
+            ],
+          ),
         ),
       ),
     ),

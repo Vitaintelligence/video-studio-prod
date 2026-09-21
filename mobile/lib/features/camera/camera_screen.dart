@@ -44,8 +44,9 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
       session.handleInterruption().then((started) {
         if (started && mounted) context.pushReplacement(Routes.upload);
       });
-    } else if (lifecycle == AppLifecycleState.resumed && !ref.read(cameraSessionProvider).isRecording) {
-      session.open();
+    } else if (lifecycle == AppLifecycleState.resumed) {
+      final phase = ref.read(cameraSessionProvider).phase;
+      if (phase == CameraPhase.opening || phase == CameraPhase.ready) session.open();
     }
   }
 
@@ -89,7 +90,12 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
           ),
           _ => Column(
             children: [
-              _TopBar(state: state, onClose: () => context.pop(), onRetake: session.retake, onTorch: session.toggleTorch),
+              _TopBar(
+                state: state,
+                onClose: () => context.pop(),
+                onRetake: session.retake,
+                onTorch: session.toggleTorch,
+              ),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
@@ -107,7 +113,10 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
                                   Semantics(
                                     liveRegion: true,
                                     label: 'Recording starts in ${state.countdown}',
-                                    child: Text('${state.countdown}', style: AppTypography.display.copyWith(fontSize: 96)),
+                                    child: Text(
+                                      '${state.countdown}',
+                                      style: AppTypography.display.copyWith(fontSize: 96),
+                                    ),
                                   ),
                               ],
                             ),
@@ -125,6 +134,8 @@ class _CameraScreenState extends ConsumerState<CameraScreen> with WidgetsBinding
 }
 
 class _Preview extends ConsumerWidget {
+  const _Preview();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final camera = ref.watch(cameraGatewayProvider);
@@ -149,7 +160,11 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           state.isRecording
-              ? AppIconButton(icon: CupertinoIcons.arrow_counterclockwise, label: 'Discard and retake', onPressed: onRetake)
+              ? AppIconButton(
+                  icon: CupertinoIcons.arrow_counterclockwise,
+                  label: 'Discard and retake',
+                  onPressed: onRetake,
+                )
               : AppIconButton(
                   icon: CupertinoIcons.xmark,
                   label: 'Close camera',
@@ -161,7 +176,9 @@ class _TopBar extends StatelessWidget {
                 liveRegion: false,
                 label: 'Recording time $time',
                 child: Text(
-                  state.isRecording || state.phase == CameraPhase.saving ? time : (state.isCountingDown ? 'Get ready' : 'Ready'),
+                  state.isRecording || state.phase == CameraPhase.saving
+                      ? time
+                      : (state.isCountingDown ? 'Get ready' : 'Ready'),
                   style: AppTypography.heading.copyWith(
                     color: state.isRecording ? AppColors.destructive : AppColors.textPrimary,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -201,7 +218,9 @@ class _Controls extends StatelessWidget {
           Semantics(
             button: true,
             enabled: enabled,
-            label: state.isRecording ? 'Stop recording' : (state.isCountingDown ? 'Cancel countdown' : 'Start recording'),
+            label: state.isRecording
+                ? 'Stop recording'
+                : (state.isCountingDown ? 'Cancel countdown' : 'Start recording'),
             excludeSemantics: true,
             onTap: enabled ? onRecord : null,
             child: GestureDetector(
@@ -225,7 +244,7 @@ class _Controls extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: state.canFlip && !state.isRecording
+            child: state.canFlip && state.canRecord
                 ? AppIconButton(icon: CupertinoIcons.camera_rotate, label: 'Flip camera', onPressed: onFlip)
                 : const SizedBox(),
           ),

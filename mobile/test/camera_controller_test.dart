@@ -41,6 +41,18 @@ void main() {
     expect(await s.stopAndClean(), isFalse);
   });
 
+  test('a permission-sheet pause does not dispose a camera that is still opening', () async {
+    final h = await Harness.create();
+    final c = h.container();
+    addTearDown(c.dispose);
+    c.listen(cameraSessionProvider, (_, _) {});
+    final s = c.read(cameraSessionProvider.notifier);
+
+    expect(c.read(cameraSessionProvider).phase, CameraPhase.opening);
+    expect(await s.handleInterruption(), isFalse);
+    expect(h.camera.closed, isFalse);
+  });
+
   test('permission denied, missing camera and hardware failure map to their own states', () async {
     for (final (kind, phase) in [
       (CameraFailureKind.permissionDenied, CameraPhase.permissionDenied),

@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from server.core.config import get_settings
+from server.db.url import ensure_sqlite_parent_directory
 
 
 @lru_cache
 def get_engine() -> Engine:
     url = get_settings().database_url
     if url.startswith("sqlite"):
+        ensure_sqlite_parent_directory(url)
         kwargs = {"connect_args": {"check_same_thread": False}}
         if ":memory:" in url or url.endswith("///"):
             kwargs["poolclass"] = StaticPool

@@ -81,6 +81,7 @@ class _SolidButtonState extends State<_SolidButton> {
       ],
     );
     return Semantics(
+      container: true,
       button: true,
       enabled: _enabled,
       label: widget.isLoading ? '${widget.label}, in progress' : widget.label,
@@ -220,6 +221,7 @@ class TertiaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = onPressed == null ? AppColors.textMuted : AppColors.accentText;
     return Semantics(
+      container: true,
       button: true,
       enabled: onPressed != null,
       label: label,
@@ -264,6 +266,7 @@ class AppIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
+      container: true,
       button: true,
       enabled: onPressed != null,
       label: label,

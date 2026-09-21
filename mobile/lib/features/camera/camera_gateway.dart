@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:camera/camera.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum CameraFailureKind { permissionDenied, unavailable, failed }
@@ -33,7 +33,6 @@ abstract interface class CameraGateway {
 class PluginCameraGateway implements CameraGateway {
   CameraController? _controller;
   List<CameraDescription> _cameras = const [];
-  bool _isOpening = false;
 
   @override
   bool canFlip = false;
@@ -43,17 +42,12 @@ class PluginCameraGateway implements CameraGateway {
 
   @override
   Future<void> open({required bool front}) async {
-    if (_isOpening) return;
-    _isOpening = true;
     await close();
     try {
       _cameras = await availableCameras();
       if (_cameras.isEmpty) throw const CameraFailure(CameraFailureKind.unavailable);
       final wanted = front ? CameraLensDirection.front : CameraLensDirection.back;
-      final description = _cameras.firstWhere(
-        (c) => c.lensDirection == wanted,
-        orElse: () => _cameras.first,
-      );
+      final description = _cameras.firstWhere((c) => c.lensDirection == wanted, orElse: () => _cameras.first);
       canFlip =
           _cameras.any((c) => c.lensDirection == CameraLensDirection.front) &&
           _cameras.any((c) => c.lensDirection == CameraLensDirection.back);
@@ -61,45 +55,53 @@ class PluginCameraGateway implements CameraGateway {
         description,
         ResolutionPreset.high,
         enableAudio: true,
+        imageFormatGroup: ImageFormatGroup.yuv420,
       );
-      await controller.initialize();
       _controller = controller;
+      await controller.initialize();
+      await controller.prepareForVideoRecording();
       hasTorch = description.lensDirection == CameraLensDirection.back;
+    } on CameraFailure {
+      rethrow;
     } on CameraException catch (e) {
-      _controller = null;
+      await close();
       final code = e.code.toLowerCase();
-      final denied = code.contains('denied') ||
-          code.contains('restricted') ||
-          code.contains('permission');
+      final denied = code.contains('denied') || code.contains('restricted') || code.contains('permission');
       throw CameraFailure(denied ? CameraFailureKind.permissionDenied : CameraFailureKind.failed);
     } catch (_) {
-      _controller = null;
+      await close();
       throw const CameraFailure(CameraFailureKind.failed);
-    } finally {
-      _isOpening = false;
     }
   }
 
   @override
   Widget preview() {
     final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) {
-      return const ColoredBox(
-        color: Color(0xFF10101C),
-        child: Center(
-          child: CupertinoActivityIndicator(color: Color(0xFFFFFFFF)),
-        ),
-      );
+    final previewSize = controller?.value.previewSize;
+    if (controller == null || previewSize == null || !controller.value.isInitialized) {
+      return const SizedBox.expand();
     }
-    return ClipRect(
-      child: CameraPreview(controller),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final portrait = constraints.maxHeight >= constraints.maxWidth;
+        final width = portrait ? previewSize.height : previewSize.width;
+        final height = portrait ? previewSize.width : previewSize.height;
+        return ClipRect(
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(width: width, height: height, child: CameraPreview(controller)),
+            ),
+          ),
+        );
+      },
     );
   }
 
   @override
   Future<void> startRecording() async {
     final c = _controller;
-    if (c == null || !c.value.isInitialized) {
+    if (c == null || !c.value.isInitialized || c.value.isRecordingVideo) {
       throw const CameraFailure(CameraFailureKind.failed);
     }
     try {
@@ -144,6 +146,8 @@ class PluginCameraGateway implements CameraGateway {
   Future<void> close() async {
     final c = _controller;
     _controller = null;
+    hasTorch = false;
+    canFlip = false;
     if (c != null) {
       try {
         await c.dispose();
@@ -152,7 +156,7 @@ class PluginCameraGateway implements CameraGateway {
   }
 }
 
-final cameraGatewayProvider = Provider<CameraGateway>((ref) {
+final cameraGatewayProvider = Provider.autoDispose<CameraGateway>((ref) {
   final gateway = PluginCameraGateway();
   ref.onDispose(gateway.close);
   return gateway;

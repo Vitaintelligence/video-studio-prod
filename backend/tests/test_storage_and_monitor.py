@@ -160,6 +160,25 @@ def test_supabase_style_configuration_uses_path_style_urls_and_generic_env_names
     assert pub.url_for("generations/x/final.mp4") == "https://abcd1234.supabase.co/storage/v1/object/public/videos/generations/x/final.mp4"
 
 
+def test_railway_bucket_configuration_uses_virtual_host_urls(monkeypatch):
+    from urllib.parse import urlparse
+
+    from server.core.config import Settings
+
+    for k, v in {"STORAGE_BACKEND": "s3", "S3_ENDPOINT_URL": "https://t3.storageapi.dev",
+                 "S3_ACCESS_KEY_ID": "AKIDTEST", "S3_SECRET_ACCESS_KEY": "secret",
+                 "S3_BUCKET": "video-studio-media-test", "S3_REGION": "auto",
+                 "S3_ADDRESSING_STYLE": "virtual"}.items():
+        monkeypatch.setenv(k, v)
+    s = Settings(_env_file=None)
+    st = R2Storage(s)
+    assert st.client.meta.config.s3["addressing_style"] == "virtual"
+    parsed = urlparse(st.presign_upload("uploads/dev/abc/clip.mp4", "video/mp4", 600).url)
+    assert parsed.netloc == "video-studio-media-test.t3.storageapi.dev"
+    assert parsed.path == "/uploads/dev/abc/clip.mp4"
+    assert "X-Amz-Signature" in parsed.query
+
+
 def test_original_r2_env_names_still_work_and_missing_credentials_are_reported(monkeypatch):
     import pytest
 

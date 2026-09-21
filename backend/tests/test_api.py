@@ -49,6 +49,35 @@ def test_auth_required_for_v1(client):
     assert client.get("/v1/generations", headers={"Authorization": f"Bearer {TEST_TOKEN}"}).status_code == 200
 
 
+def test_device_session_authenticates_one_install(env, fake_redis, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from server.api.main import create_app
+    from server.core.config import Settings
+    from server.services.ratelimit import RateLimiter
+
+    monkeypatch.setenv("AUTH_MODE", "device_session")
+    monkeypatch.setenv("DEVICE_AUTH_SECRET", "device-session-test-secret-0123456789abcdef")
+    settings = Settings(_env_file=None)
+    app = create_app(settings)
+    app.state.get_rate_limiter = lambda: RateLimiter(fake_redis)
+    with TestClient(app) as c:
+        install_id = str(uuid.uuid4())
+        issued = c.post("/v1/auth/device-session", json={"install_id": install_id})
+        assert issued.status_code == 200
+        token = issued.json()["access_token"]
+        assert issued.json()["token_type"] == "bearer"
+        assert c.get("/v1/generations", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+        presign = c.post(
+            "/v1/uploads/presign",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"filename": "ios clip.mov", "content_type": "video/quicktime", "purpose": "source_video", "size_bytes": 10},
+        )
+        assert presign.status_code == 200
+        assert presign.json()["key"].startswith("uploads/device_")
+        assert c.get("/v1/generations", headers={"Authorization": f"Bearer {token}x"}).status_code == 401
+
+
 def test_production_requires_strong_token(env, monkeypatch):
     import pytest
 
@@ -101,7 +130,7 @@ def test_no_unrestricted_agent_endpoints(client):
     for path in schema["paths"]:
         assert not any(word in path.lower() for word in forbidden), path
     assert set(schema["paths"]) == {
-        "/health", "/ready", "/v1/capabilities", "/v1/generations", "/v1/generations/{generation_id}",
+        "/health", "/ready", "/v1/auth/device-session", "/v1/capabilities", "/v1/generations", "/v1/generations/{generation_id}",
         "/v1/generations/{generation_id}/cancel", "/v1/uploads/presign", "/v1/uploads/{asset_id}/complete",
         "/v1/projects", "/v1/projects/{project_id}", "/v1/edits", "/v1/edits/{edit_id}", "/v1/edits/{edit_id}/cancel",
         "/v1/edits/{edit_id}/instructions", "/v1/edits/{edit_id}/variants",
@@ -321,6 +350,16 @@ def test_capabilities_unknown_then_published(client, fake_redis, env):
     assert r["pipelines"] == [{"id": "app-cinematic", "enabled": True}]
     assert r["features"]["text_to_video"] and r["features"]["tts"] and r["features"]["captions"]
     assert "key" not in json.dumps(r).lower().replace("keys", "")
+
+
+def test_mock_runtime_generation_does_not_require_paid_visual_provider(env):
+    from server.services.capabilities import normalize
+
+    raw = {"registry_ok": True, "capabilities": {}, "composition_runtimes": {"ffmpeg": True}}
+    caps = normalize(raw, env["settings"])
+    assert env["settings"].orchestrator_provider == "mock"
+    assert caps["generation_available"] is True
+    assert caps["pipelines"] == [{"id": "app-cinematic", "enabled": True}]
 
 
 # -- uploads -----------------------------------------------------------------

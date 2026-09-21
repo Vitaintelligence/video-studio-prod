@@ -33,10 +33,11 @@ puts the job back to `queued` and re-publishes it.
 `STORAGE_BACKEND=s3` (or `r2`) works with any S3-compatible store. Preferred variable names: `S3_ENDPOINT_URL`,
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, `S3_PUBLIC_BASE_URL` (the older `R2_*` names still work).
 
-| Provider | `S3_ENDPOINT_URL` | `S3_REGION` | `S3_PUBLIC_BASE_URL` (optional) |
-|---|---|---|---|
-| Supabase Storage | `https://<project-ref>.storage.supabase.co/storage/v1/s3` | your project's region, e.g. `ap-south-1` | `https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>` (public bucket) |
-| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | the bucket's public r2.dev / custom domain |
+| Provider | `S3_ENDPOINT_URL` | `S3_REGION` | `S3_ADDRESSING_STYLE` | `S3_PUBLIC_BASE_URL` (optional) |
+|---|---|---|---|---|
+| Supabase Storage | `https://<project-ref>.storage.supabase.co/storage/v1/s3` | your project's region, e.g. `ap-south-1` | `path` | `https://<project-ref>.supabase.co/storage/v1/object/public/<bucket>` (public bucket) |
+| Railway Buckets | Railway credential endpoint | `auto` | `virtual` | leave unset (signed URLs) |
+| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` | `path` | the bucket's public r2.dev / custom domain |
 
 Supabase: create a bucket (Storage), then Project Settings -> Storage -> S3 Connection -> create access keys. Those keys
 have full access to every bucket in the project: keep them on Railway (api + worker) only. Watch the plan's per-file upload
@@ -64,7 +65,10 @@ keeps checkpoints, schema validation, self-review, cost governance and render ve
 See [.env.example](.env.example) (provider variables are copied verbatim from upstream's `.env.example`). Key points:
 
 - `DATABASE_URL` accepts Railway's `postgresql://` form. `ENABLE_API_DOCS` defaults to off in production.
-- Production requires `DEV_API_TOKEN` (>= 24 chars); the app refuses to start otherwise.
+- The container fallback is SQLite at `/workspace/storage/dev.db`; its parent directory is created automatically. This is
+  useful for a single-container trial or an attached volume, but API + worker deployments must share Postgres by setting
+  `DATABASE_URL` on both services.
+- Production `AUTH_MODE=device_session` requires `DEVICE_AUTH_SECRET` (>= 32 chars). The mobile app exchanges a random per-install UUID for a signed anonymous session; no backend secret is shipped in the APK. `AUTH_MODE=dev_token` remains available for local development and requires `DEV_API_TOKEN` (>= 24 chars).
 - `STORAGE_BACKEND=r2` needs `R2_ENDPOINT_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. With
   `R2_PUBLIC_BASE_URL` set, URLs are public/CDN; without it they are signed and expire after `SIGNED_URL_TTL_SECONDS`.
   The DB stores object **keys**; URLs are derived at read time.
@@ -72,7 +76,7 @@ See [.env.example](.env.example) (provider variables are copied verbatim from up
 
 | Service | needs |
 |---|---|
-| api | `APP_ENV`, `AUTH_MODE`, `DEV_API_TOKEN`, `DATABASE_URL`, `REDIS_URL`, (R2 vars if presigning uploads / signed URLs) |
+| api | `APP_ENV`, `AUTH_MODE`, `DEVICE_AUTH_SECRET` (or `DEV_API_TOKEN` locally), `DATABASE_URL`, `REDIS_URL`, (R2 vars if presigning uploads / signed URLs) |
 | worker | `APP_ENV`, `DATABASE_URL`, `REDIS_URL`, `ORCHESTRATOR_PROVIDER`, `ANTHROPIC_API_KEY`, `MAX_JOB_BUDGET_USD`, R2 vars, provider keys |
 
 `/v1/capabilities` is computed by the **worker** from the real OpenMontage registry (`discover()` +

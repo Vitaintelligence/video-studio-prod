@@ -9,6 +9,9 @@ abstract final class AppTheme {
     const scheme = ColorScheme.dark(
       primary: AppColors.accent,
       onPrimary: AppColors.onAccent,
+      primaryContainer: AppColors.accentSoft,
+      onPrimaryContainer: AppColors.accentText,
+      secondary: AppColors.accentSecondary,
       surface: AppColors.surface,
       onSurface: AppColors.textPrimary,
       error: AppColors.destructive,
@@ -20,9 +23,11 @@ abstract final class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: AppColors.background,
       canvasColor: AppColors.background,
+      fontFamily: 'Roboto',
       splashFactory: NoSplash.splashFactory,
       highlightColor: Colors.transparent,
       dividerColor: AppColors.divider,
+      visualDensity: VisualDensity.standard,
       textTheme: const TextTheme(
         displayLarge: AppTypography.display,
         headlineMedium: AppTypography.title,
@@ -48,6 +53,20 @@ abstract final class AppTheme {
         backgroundColor: AppColors.surfacePressed,
         contentTextStyle: AppTypography.body,
         shape: RoundedRectangleBorder(borderRadius: AppRadius.mediumAll),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surfaceRaised,
+        modalBackgroundColor: AppColors.surfaceRaised,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          side: BorderSide(color: AppColors.surfaceBorder),
+        ),
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: AppColors.surfaceRaised,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.largeAll),
       ),
     );
   }

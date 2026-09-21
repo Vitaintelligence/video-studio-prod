@@ -3,13 +3,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/api/adcut_api.dart';
 import '../core/api/api_client.dart';
+import '../core/api/api_config.dart';
+import '../core/api/device_session.dart';
 import '../core/models/api_models.dart';
 
 /// Provided in `main()` (and overridden in tests).
 final preferencesProvider = Provider<SharedPreferences>((ref) => throw UnimplementedError('preferencesProvider'));
 
+/// Resolved once during app startup. Production uses a server-signed device
+/// session; the compile-time token remains only as a local-development fallback.
+final apiTokenProvider = Provider<String?>((ref) => ApiConfig.devToken.isEmpty ? null : ApiConfig.devToken);
+
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final client = ApiClient();
+  final preferences = ref.watch(preferencesProvider);
+  final client = ApiClient(token: ref.watch(apiTokenProvider), refreshToken: () => DeviceSession.refresh(preferences));
   ref.onDispose(client.close);
   return client;
 });

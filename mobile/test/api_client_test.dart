@@ -142,6 +142,27 @@ void main() {
     );
   });
 
+  test('a stale device token is refreshed once and the request is replayed', () async {
+    var calls = 0;
+    final seenAuth = <String?>[];
+    final client = ApiClient(
+      httpClient: MockClient((request) async {
+        calls++;
+        seenAuth.add(request.headers['Authorization']);
+        return calls == 1 ? http.Response('', 401) : http.Response('{}', 200);
+      }),
+      baseUrl: 'https://api.test',
+      token: 'stale-token',
+      refreshToken: () async => 'fresh-token',
+      debugLog: false,
+    );
+
+    await client.getJson('/v1/capabilities');
+
+    expect(calls, 2);
+    expect(seenAuth, ['Bearer stale-token', 'Bearer fresh-token']);
+  });
+
   test('idempotency key and JSON body are sent on create', () async {
     late http.Request captured;
     final client = ApiClient(

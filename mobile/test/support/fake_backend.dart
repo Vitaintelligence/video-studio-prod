@@ -80,8 +80,8 @@ class FakeBackend {
       'warnings': e['warnings'] ?? <String>[],
       'error': e['error'],
       'versions': _versionsOf(e),
-      'created_at': '2026-09-20T10:00:00Z',
-      'updated_at': '2026-09-20T10:00:05Z',
+      'created_at': '2025-09-20T10:00:00Z',
+      'updated_at': '2025-09-20T10:00:05Z',
     };
   }
 
@@ -99,7 +99,7 @@ class FakeBackend {
         'progress': done ? 100 : x['progress'],
         'output_url': done ? outputUrl : null,
         'thumbnail_url': null,
-        'created_at': '2026-09-20T10:00:00Z',
+        'created_at': '2025-09-20T10:00:00Z',
       };
     }
 
@@ -216,7 +216,7 @@ class FakeBackend {
         'purpose': 'source_video',
         'size_bytes': a['stored'],
         'status': 'uploaded',
-        'created_at': '2026-09-20T10:00:00Z',
+        'created_at': '2025-09-20T10:00:00Z',
       });
     }
     if (m == 'POST' && path == '/v1/edits') {
@@ -314,8 +314,8 @@ class FakeBackend {
             {
               'id': 'proj-1',
               'name': 'UGC Test',
-              'created_at': '2026-09-20T10:00:00Z',
-              'updated_at': '2026-09-20T10:00:05Z',
+              'created_at': '2025-09-20T10:00:00Z',
+              'updated_at': '2025-09-20T10:00:05Z',
               'edit_count': roots.length,
               'latest_edit': _editJson(roots.last),
             },
@@ -328,8 +328,8 @@ class FakeBackend {
       return _json(200, {
         'id': 'proj-1',
         'name': 'UGC Test',
-        'created_at': '2026-09-20T10:00:00Z',
-        'updated_at': '2026-09-20T10:00:05Z',
+        'created_at': '2025-09-20T10:00:00Z',
+        'updated_at': '2025-09-20T10:00:05Z',
         'edit_count': roots.length,
         'latest_edit': roots.isEmpty ? null : _editJson(roots.last),
         'assets': [],

@@ -64,21 +64,34 @@ const maxRecording = Duration(minutes: 5);
 class CameraSession extends Notifier<CameraState> {
   Timer? _ticker;
   final Stopwatch _clock = Stopwatch();
-  bool _opening = false;
-
-  CameraGateway get _camera => ref.read(cameraGatewayProvider);
+  late final CameraGateway _camera;
+  Future<void>? _opening;
 
   @override
   CameraState build() {
+    // Keep the auto-disposed hardware gateway alive for the whole camera
+    // session, including slow Android permission and initialization flows.
+    _camera = ref.watch(cameraGatewayProvider);
     ref.onDispose(() => _ticker?.cancel());
     return const CameraState();
   }
 
   Future<void> open({bool? front}) async {
-    if (_opening) return;
-    _opening = true;
+    final inFlight = _opening;
+    if (inFlight != null) return inFlight;
+
     final useFront = front ?? state.front;
     state = state.copyWith(phase: CameraPhase.opening, front: useFront, torch: false);
+    final operation = _openCamera(useFront);
+    _opening = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_opening, operation)) _opening = null;
+    }
+  }
+
+  Future<void> _openCamera(bool useFront) async {
     try {
       await _camera.open(front: useFront);
       if (!ref.mounted) return;
@@ -92,8 +105,6 @@ class CameraSession extends Notifier<CameraState> {
           CameraFailureKind.failed => CameraPhase.failed,
         },
       );
-    } finally {
-      _opening = false;
     }
   }
 
@@ -198,8 +209,12 @@ class CameraSession extends Notifier<CameraState> {
   /// The app left the foreground: keep what was recorded rather than losing it, then free the camera.
   Future<bool> handleInterruption() async {
     if (state.isRecording) return stopAndClean();
+    _countdownToken = null;
+    // A system permission sheet can pause Android while open() is still
+    // initializing. Disposing at that point leaves the plugin half-open.
+    if (state.phase == CameraPhase.opening || state.phase == CameraPhase.saving) return false;
     await _camera.close();
-    state = state.copyWith(phase: CameraPhase.opening);
+    if (ref.mounted) state = state.copyWith(phase: CameraPhase.opening, countdown: 0, torch: false);
     return false;
   }
 }

@@ -1,29 +1,32 @@
 import 'package:flutter/painting.dart';
 
-/// Semantic color tokens. Dark-first, one flat accent. Feature code never uses raw colors.
+/// Semantic color tokens for AdCut's dark, creator-focused visual language.
+/// Feature code never uses raw colors.
 abstract final class AppColors {
-  static const Color background = Color(0xFF0B0C0F);
-  static const Color surface = Color(0xFF13151A);
-  static const Color surfaceRaised = Color(0xFF191C22);
-  static const Color surfacePressed = Color(0xFF22262E);
-  static const Color divider = Color(0xFF292D35);
+  static const Color background = Color(0xFF08090E);
+  static const Color surface = Color(0xFF11141C);
+  static const Color surfaceRaised = Color(0xFF181D29);
+  static const Color surfacePressed = Color(0xFF22293A);
+  static const Color divider = Color(0xFF2A3142);
+  static const Color surfaceBorder = Color(0xFF252B3A);
 
-  static const Color textPrimary = Color(0xFFF6F7F9);
-  static const Color textSecondary = Color(0xFFA1A7B2);
-  static const Color textMuted = Color(0xFF767D89);
+  static const Color textPrimary = Color(0xFFF7F8FC);
+  static const Color textSecondary = Color(0xFFAAB1C0);
+  static const Color textMuted = Color(0xFF747D91);
 
-  static const Color accent = Color(0xFF00E5FF);
-  static const Color accentPressed = Color(0xFF00BCE6);
-  static const Color onAccent = Color(0xFF07090E);
-  static const Color accentText = Color(0xFF00E5FF);
-  static const Color accentDisabled = Color(0xFF22262E);
-  static const Color accentGlow = Color(0x3300E5FF);
-  static const Color accentSubtle = Color(0x1800E5FF);
+  static const Color accent = Color(0xFF765CF6);
+  static const Color accentPressed = Color(0xFF6449DC);
+  static const Color onAccent = Color(0xFFFFFFFF);
+  static const Color onAccentMuted = Color(0xFFDCD5FF);
+  static const Color accentText = Color(0xFFB9AAFF);
+  static const Color accentSecondary = Color(0xFF24D2B3);
+  static const Color accentSoft = Color(0xFF211C3C);
+  static const Color accentDisabled = Color(0xFF242938);
 
-  static const Color success = Color(0xFF3DBE6B);
-  static const Color warning = Color(0xFFE8A93A);
-  static const Color destructive = Color(0xFFE5534B);
-  static const Color destructivePressed = Color(0xFFC4453E);
+  static const Color success = Color(0xFF40D48A);
+  static const Color warning = Color(0xFFF2B84B);
+  static const Color destructive = Color(0xFFFF526F);
+  static const Color destructivePressed = Color(0xFFE34460);
   static const Color onDestructive = Color(0xFFFFFFFF);
 
   static const Color scrim = Color(0xB3000000);
