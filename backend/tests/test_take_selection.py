@@ -242,8 +242,9 @@ def test_take_analyzer_analyze_then_edl_with_agent_decisions(tmp_path):
     override = tool.execute({"operation": "edl", "analysis_path": res.data["analysis_path"],
                              "decisions": {"decisions": [{"group": "g1", "keep": "u5"}, {"group": "g2", "keep": "u404"}],
                                            "drop_meta": []}})
-    assert [s["take"] for s in override.data["segments"]] == ["u5", "u7"]  # g2 pick was invalid -> engine's choice
-    assert any("u404" in p for p in override.data["decision_problems"])
+    assert [s["take"] for s in override.data["segments"]] == ["u4", "u7"]  # u5 is measurably worse, u404 is not a take
+    problems = override.data["decision_problems"]
+    assert any("u404" in p for p in problems) and any("u5" in p and "worse" in p for p in problems)
     assert not tool.execute({"operation": "nope"}).success
     assert not tool.execute({"operation": "analyze", "input_path": str(tmp_path / "missing.mp4")}).success
 
@@ -294,3 +295,24 @@ def test_llm_prompt_delimits_untrusted_data_uses_temp_zero_and_carries_no_secret
     assert "<<<DATA" in user and "DATA>>>" in user and "<<<BRIEF" in user
     assert len(user) < 20000 and "untrusted" in SYSTEM.lower()
     assert "api" not in user.lower().replace("apis", "") or "key" not in user.lower()
+
+
+def test_a_model_pick_cannot_swap_in_a_measurably_worse_take_but_may_break_a_tie():
+    """Regression (live): Qwen picked the stumbled 'twen, twenty' take over the clean one."""
+    tr = json.loads((FIXTURES / "messy_takes_transcript.json").read_text(encoding="utf-8"))
+    a = analyze_transcript(tr)
+    g1, g2 = a["groups"][0], a["groups"][1]
+    worse_g1 = "u3"  # the flubbed "um, this serum for two" take
+    worse_g2 = next(t for t in g2["take_ids"] if t != g2["recommended"])            # the "twen, twenty" stumble
+
+    picks, _, problems = validate_picks(a, {"decisions": [{"group": "g1", "keep": worse_g1}, {"group": "g2", "keep": worse_g2}]})
+    assert picks == {} and len(problems) == 2 and all("worse" in p for p in problems)
+    assert [s["take"] for s in build_edl(a, picks)["segments"]] == [g1["recommended"], g2["recommended"]]
+
+    twin = analyze_transcript(mk((LINE, 1.0), (LINE, 8.0)))  # two equally clean reads: the model may choose either
+    other = next(t for t in twin["groups"][0]["take_ids"] if t != twin["groups"][0]["recommended"])
+    picks, _, problems = validate_picks(twin, {"decisions": [{"group": "g1", "keep": other}]})
+    assert picks == {"g1": other} and problems == []
+
+    picks, _, problems = validate_picks(a, {"decisions": [{"group": "g2", "keep": None}]})  # the model may not delete a good line
+    assert picks == {} and "usable take" in problems[0]

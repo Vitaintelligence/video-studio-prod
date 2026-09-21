@@ -381,8 +381,30 @@ def llm_view(analysis: dict[str, Any], max_words: int = 6000) -> dict[str, Any]:
     return {"duration": analysis["duration"], "groups": out_groups, "off_script_candidates": meta}
 
 
+PICK_SCORE_MARGIN = 0.05  # a model pick may trail the engine's choice by at most this much (a tie-break, not a veto)
+
+
+def _defects(u: dict[str, Any]) -> int:
+    return int(u["fillers"]) + int(u["repeats"]) + int(u["low_conf"]) + int(u["hesitations"])
+
+
+def _pick_is_comparable(analysis: dict[str, Any], group: dict[str, Any], keep: str) -> bool:
+    """The model may choose between takes the engine finds comparable (e.g. which of two clean reads has the better
+    hook). It may not swap in a take that is measurably worse: less complete, lower scoring, or with more stumbles,
+    fillers or hesitations than the engine's own choice."""
+    rec = group.get("recommended")
+    if rec is None or keep == rec:
+        return True
+    utt = {u["id"]: u for u in analysis["utterances"]}
+    a, b = utt[keep], utt[rec]
+    return (a["score"] >= b["score"] - PICK_SCORE_MARGIN
+            and a["scores"].get("completeness", 0.0) >= b["scores"].get("completeness", 0.0) - PICK_SCORE_MARGIN
+            and _defects(a) <= _defects(b))
+
+
 def validate_picks(analysis: dict[str, Any], decisions: Any) -> tuple[dict[str, str | None], list[str], list[str]]:
-    """Validate untrusted (LLM) decisions. Returns (picks, drop_ids, problems). Unknown ids are ignored."""
+    """Validate untrusted (LLM) decisions. Returns (picks, drop_ids, problems). Unknown ids are ignored and a pick that
+    is measurably worse than the engine's own choice is rejected (the engine's choice then stands)."""
     problems: list[str] = []
     picks: dict[str, str | None] = {}
     drop: list[str] = []
@@ -398,9 +420,15 @@ def validate_picks(analysis: dict[str, Any], decisions: Any) -> tuple[dict[str, 
             problems.append(f"unknown group {gid!r}")
             continue
         if keep is None or keep == "none":
-            picks[gid] = None
+            if groups[gid].get("recommended") is None:
+                picks[gid] = None
+            else:
+                problems.append(f"dropping {gid} rejected: the engine found a usable take")
         elif keep in groups[gid]["take_ids"]:
-            picks[gid] = keep
+            if _pick_is_comparable(analysis, groups[gid], keep):
+                picks[gid] = keep
+            else:
+                problems.append(f"take {keep!r} rejected: measurably worse than the engine's choice for {gid}")
         else:
             problems.append(f"take {keep!r} is not in {gid}")
     for i in decisions.get("drop_meta", []) if isinstance(decisions.get("drop_meta"), list) else []:

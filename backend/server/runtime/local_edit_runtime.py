@@ -34,6 +34,16 @@ from server.services.take_llm import decide_takes
 
 log = structlog.get_logger(__name__)
 
+
+def _picked_ids(decisions) -> dict[str, str | None]:
+    """The model's group -> take choices, reduced to short ids for logging (its free text is never logged)."""
+    out: dict[str, str | None] = {}
+    items = decisions.get("decisions") if isinstance(decisions, dict) else None
+    for d in items if isinstance(items, list) else []:
+        if isinstance(d, dict):
+            out[str(d.get("group"))[:12]] = None if d.get("keep") is None else str(d.get("keep"))[:12]
+    return out
+
 LOCAL_EDIT_STAGES = ["ingest", "broll", "analyze", "plan", "edit", "captions", "render"]
 TERM_GRACE_SECONDS = 8
 MIN_SPEECH_WORDS = 4
@@ -161,6 +171,12 @@ class LocalEditRuntime(RuntimeOrchestrator):
                 return None, {}
             for seg in e.event["segments"]:
                 timeline.append({"source": idx, "start": seg["start"], "end": seg["end"]})
+            log.info(  # ids and scores only: never the transcript, which is the user's speech
+                "take_decision",
+                engine_recommended={g["group"]: g["recommended"] for g in p.event["llm_view"]["groups"]},
+                model_picks=_picked_ids(decisions), rejected_picks=[str(x)[:120] for x in e.event.get("problems", [])][:6],
+                kept=[seg.get("take") for seg in e.event["segments"]],
+            )
             st = e.event["stats"]
             totals["retakes_removed"] += st["dropped_takes"]
             totals["off_script_removed"] += st["off_script_removed"]

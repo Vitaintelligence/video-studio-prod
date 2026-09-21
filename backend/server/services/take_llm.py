@@ -25,7 +25,10 @@ You receive JSON describing repeated takes. Each group is ONE line the speaker s
 id, timing, the transcript text and objective scores (completeness, fillers, stumbles). Choose the single best take
 per group: the most complete, fluent, natural delivery that best serves the editing brief. Prefer the engine's
 `recommended` take unless the text gives a clear reason to prefer another (wrong or missing words, a stumble, a
-weaker hook). You may drop a whole group by returning keep=null if it is clearly unusable.
+weaker hook). Speech recognition often writes a stumbled or mispronounced word as a real but out-of-place word
+(for example "use code glow for twin, 20% off"): the engine cannot hear that, so read every take as a finished
+sentence and reject one that contains a word that does not belong, however fluent its scores look. Never choose a
+take with a wrong word over one that reads correctly. You may not drop a group that has a usable take.
 Also list `off_script_candidates` ids that are NOT part of the content (asides, "wait let me restart") in drop_meta.
 
 Rules:

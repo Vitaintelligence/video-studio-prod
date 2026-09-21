@@ -104,9 +104,12 @@ def test_messy_37s_clip_becomes_a_clean_cut_with_only_the_best_takes(client, upl
     assert said.count("serum") == 1  # said once, not five times
 
 
-def test_qwen_choice_overrides_the_engine_but_only_among_real_takes(client, upload_asset, real_engine):
-    # Decision: for line 1 keep u3 (the flubbed take that never reaches "amazing"), drop off-script chatter.
-    provider = StubProvider('```json\n{"decisions":[{"group":"g1","keep":"u3","reason":"test"},{"group":"g2","keep":"u404"}],"drop_meta":["u2","u999"]}\n```')
+def test_qwen_cannot_swap_in_worse_takes_or_invent_ids(client, upload_asset, real_engine):
+    """The model's picks are a tie-break among comparable takes: a clearly worse take, a deleted line and an invented
+    id are all ignored, and the engine's own choice stands."""
+    provider = StubProvider(
+        '```json\n{"decisions":[{"group":"g1","keep":"u3","reason":"test"},{"group":"g2","keep":null},'
+        '{"group":"g9","keep":"u404"}],"drop_meta":["u2","u999"]}\n```')
     settings = real_engine["settings"].model_copy(update={
         "openrouter_api_key": SecretStr("test-key"), "openrouter_editing_model": "qwen/qwen3.7-flash"})
     a = upload_asset(MESSY)
@@ -116,8 +119,8 @@ def test_qwen_choice_overrides_the_engine_but_only_among_real_takes(client, uplo
     st = client.get(f"/v1/edits/{eid}").json()
     assert st["status"] == "completed" and st["insights"]["llm_used"] is True
     said = _speech(_output(real_engine, st))
-    assert "amazing" not in said and re.search(r"for (two|2)\b", said)  # model's pick (u3: the flubbed take) was honoured
-    assert "today" in said  # invalid pick for g2 ("u404") was ignored: the engine's clean take stays
+    assert "amazing" in said and "today" in said  # the engine's clean takes stayed
+    assert not re.search(r"\bum\b", said) and said.count("serum") == 1, said  # the flubbed take was not let back in
     assert len(provider.calls) == 1
     messages, kw = provider.calls[0]
     assert kw["model"] == "qwen/qwen3.7-flash" and "test-key" not in json.dumps(messages)
