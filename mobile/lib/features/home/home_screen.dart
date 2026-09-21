@@ -151,108 +151,84 @@ class HomeScreen extends ConsumerWidget {
         .firstOrNull;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _HomeBackdrop()),
-          SafeArea(
-            bottom: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.xl),
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.gutter, 0, AppSpacing.gutter, AppSpacing.xl),
+          children: [
+            SizedBox(
+              height: 64,
+              child: Row(
+                children: [
+                  const Expanded(child: _Brand()),
+                  AppIconButton(
+                    icon: CupertinoIcons.person_crop_circle,
+                    label: 'Account',
+                    onPressed: () => context.push(Routes.account),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text('What are you making today?', style: AppTypography.display),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Record or upload. AdCut handles the edit.',
+              style: AppTypography.bodySecondary.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            if (capabilities.hasError) ...[
+              _Notice(
+                icon: CupertinoIcons.wifi_slash,
+                message: 'Backend connection needs attention. Tap to retry.',
+                onTap: () => ref.invalidate(capabilitiesProvider),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (clean.isBusy) ...[
+              _Notice(
+                icon: CupertinoIcons.arrow_up_circle,
+                message: 'Uploading your video',
+                onTap: () => context.push(Routes.upload),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
+            if (unavailable)
+              const _Notice(
+                icon: CupertinoIcons.exclamationmark_triangle_fill,
+                message: 'Editing is unavailable right now. Please try again shortly.',
+              )
+            else if (intents.isNotEmpty) ...[
+              _PrimaryIntent(info: _info[intents.first]!, onTap: () => _run(context, ref, intents.first, projects)),
+              for (final intent in intents.skip(1)) ...[
+                if (intent == firstMore) ...[
+                  const SizedBox(height: AppSpacing.xl),
+                  const Text('Do more', style: AppTypography.heading),
+                ],
+                const SizedBox(height: AppSpacing.xs),
+                _IntentRow(info: _info[intent]!, onTap: () => _run(context, ref, intent, projects)),
+              ],
+            ],
+            const SizedBox(height: AppSpacing.xxl),
+            Row(
               children: [
-                SizedBox(
-                  height: 64,
-                  child: Row(
-                    children: [
-                      const Expanded(child: _Brand()),
-                      AppIconButton(
-                        icon: CupertinoIcons.person_crop_circle,
-                        label: 'Account',
-                        onPressed: () => context.push(Routes.account),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                const Text('What are you making today?', style: AppTypography.display),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Record or upload. AdCut handles the edit.',
-                  style: AppTypography.bodySecondary.copyWith(color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                if (capabilities.hasError) ...[
-                  _Notice(
-                    icon: CupertinoIcons.wifi_slash,
-                    message: 'Backend connection needs attention. Tap to retry.',
-                    onTap: () => ref.invalidate(capabilitiesProvider),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
-                if (clean.isBusy) ...[
-                  _Notice(
-                    icon: CupertinoIcons.arrow_up_circle,
-                    message: 'Uploading your video',
-                    onTap: () => context.push(Routes.upload),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
-                if (unavailable)
-                  const _Notice(
-                    icon: CupertinoIcons.exclamationmark_triangle_fill,
-                    message: 'Editing is unavailable right now. Please try again shortly.',
-                  )
-                else if (intents.isNotEmpty) ...[
-                  _PrimaryIntent(info: _info[intents.first]!, onTap: () => _run(context, ref, intents.first, projects)),
-                  for (final intent in intents.skip(1)) ...[
-                    if (intent == firstMore) ...[
-                      const SizedBox(height: AppSpacing.xl),
-                      const Text('Do more', style: AppTypography.heading),
-                    ],
-                    const SizedBox(height: AppSpacing.xs),
-                    _IntentRow(info: _info[intent]!, onTap: () => _run(context, ref, intent, projects)),
-                  ],
-                ],
-                const SizedBox(height: AppSpacing.xxl),
-                Row(
-                  children: [
-                    const Expanded(child: Text('Recent', style: AppTypography.heading)),
-                    if (recent.isNotEmpty)
-                      TertiaryButton(label: 'See all', onPressed: () => context.go(Routes.projects)),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                if (recent.isEmpty)
-                  const Text('Your finished cuts will show up here.', style: AppTypography.bodySecondary)
-                else
-                  for (final p in recent) ...[
-                    ProjectTile(project: p, onTap: () => context.push(Routes.edit(p.latestEdit!.id))),
-                    const SizedBox(height: AppSpacing.xs),
-                  ],
+                const Expanded(child: Text('Recent', style: AppTypography.heading)),
+                if (recent.isNotEmpty) TertiaryButton(label: 'See all', onPressed: () => context.go(Routes.projects)),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            if (recent.isEmpty)
+              const Text('Your finished cuts will show up here.', style: AppTypography.bodySecondary)
+            else
+              for (final p in recent) ...[
+                ProjectTile(project: p, onTap: () => context.push(Routes.edit(p.latestEdit!.id))),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+          ],
+        ),
       ),
     );
   }
-}
-
-class _HomeBackdrop extends StatelessWidget {
-  const _HomeBackdrop();
-
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
-      color: AppColors.background,
-      gradient: RadialGradient(
-        center: Alignment(1.15, -1.1),
-        radius: 1.15,
-        colors: [Color(0x3824D2B3), Color(0x1E765CF6), AppColors.background],
-        stops: [0, 0.42, 1],
-      ),
-    ),
-  );
 }
 
 class _Brand extends StatelessWidget {
@@ -269,8 +245,8 @@ class _Brand extends StatelessWidget {
         Container(
           width: 32,
           height: 32,
-          decoration: const BoxDecoration(gradient: AppColors.brandGradient, borderRadius: AppRadius.smallAll),
-          child: const Icon(CupertinoIcons.scissors, size: 17, color: AppColors.onAccent),
+          decoration: const BoxDecoration(color: AppColors.accentSoft, borderRadius: AppRadius.smallAll),
+          child: const Icon(CupertinoIcons.scissors, size: 17, color: AppColors.accentText),
         ),
         const SizedBox(width: AppSpacing.xs),
         const Text('AdCut', style: AppTypography.heading),
@@ -299,9 +275,9 @@ class _PrimaryIntent extends StatelessWidget {
       },
       child: DecoratedBox(
         decoration: const BoxDecoration(
-          gradient: AppColors.brandGradient,
+          color: AppColors.surfaceRaised,
           borderRadius: AppRadius.largeAll,
-          boxShadow: [BoxShadow(color: Color(0x55765CF6), blurRadius: 28, offset: Offset(0, 12))],
+          border: Border.fromBorderSide(BorderSide(color: AppColors.surfaceBorder)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -313,23 +289,20 @@ class _PrimaryIntent extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-                      decoration: BoxDecoration(
-                        color: AppColors.onAccent.withValues(alpha: 0.14),
-                        borderRadius: AppRadius.pillAll,
-                      ),
+                      decoration: const BoxDecoration(color: AppColors.accentSoft, borderRadius: AppRadius.pillAll),
                       child: Text(
                         'ONE-TAP EDIT',
                         style: AppTypography.caption.copyWith(
-                          color: AppColors.onAccentMuted,
+                          color: AppColors.accentText,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
                         ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.sm),
-                    Text(info.title, style: AppTypography.title.copyWith(color: AppColors.onAccent)),
+                    Text(info.title, style: AppTypography.title),
                     const SizedBox(height: AppSpacing.xxs),
-                    Text(info.subtitle, style: AppTypography.bodySecondary.copyWith(color: AppColors.onAccentMuted)),
+                    Text(info.subtitle, style: AppTypography.bodySecondary),
                   ],
                 ),
               ),
@@ -337,11 +310,7 @@ class _PrimaryIntent extends StatelessWidget {
               Container(
                 width: 52,
                 height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.onAccent.withValues(alpha: 0.14),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.onAccent.withValues(alpha: 0.22)),
-                ),
+                decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle),
                 child: Icon(info.icon, size: 25, color: AppColors.onAccent),
               ),
             ],

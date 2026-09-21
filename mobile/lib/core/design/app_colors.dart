@@ -31,16 +31,4 @@ abstract final class AppColors {
 
   static const Color scrim = Color(0xB3000000);
   static const Color videoBackdrop = Color(0xFF000000);
-
-  static const LinearGradient brandGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF8468FF), Color(0xFF5D5CEB), Color(0xFF3879E9)],
-  );
-
-  static const LinearGradient brandGlow = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0x33765CF6), Color(0x0024D2B3)],
-  );
 }
