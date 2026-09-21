@@ -47,7 +47,7 @@ class ApiException implements Exception {
       case 'INVALID_MEDIA':
         return message;
       case 'UNAUTHORIZED':
-        return 'Your session is not authorized. Please sign in again.';
+        return "We couldn't start a secure device session. Check your connection and reopen AdCut.";
       case 'RATE_LIMITED':
         return 'Too many requests. Please wait a moment and try again.';
       case 'PAYLOAD_TOO_LARGE':
