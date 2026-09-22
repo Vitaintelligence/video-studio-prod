@@ -45,6 +45,10 @@ FINAL_LOUDNORM_FILTER = "loudnorm=I=-16:LRA=11:TP=-1.5"
 CAPTION_MAX_CHARS = 42
 CAPTION_MAX_SECONDS = 3.2
 CAPTION_GAP_SECONDS = 0.45
+# libass' ASS "Fontsize"/"MarginV" are near resolution-independent (unlike drawtext's pixel fontsize elsewhere in
+# this file) - checked empirically across all three aspect presets (720x1280, 720x720, 1280x720). Do not scale by h.
+CAPTION_FONT_SIZE = 24
+CAPTION_MARGIN_V = 40
 
 
 class EditError(Exception):
@@ -356,7 +360,7 @@ def _escape_filter_path(path: str) -> str:
     return path.replace("\\", "/").replace(":", r"\:")
 
 
-def add_captions(final: Path, work: Path, h: int) -> bool:
+def add_captions(final: Path, work: Path) -> bool:
     """Transcribes the finished cut and burns in real captions. Returns False (video left untouched) on any
     failure - no speech, no ffmpeg subtitle support, anything - so a caption request is never silently faked."""
     if importlib.util.find_spec("faster_whisper") is None:
@@ -371,9 +375,8 @@ def add_captions(final: Path, work: Path, h: int) -> bool:
     if not cues:
         return False
     write_srt(cues, work / "captions.srt")
-    size = max(h // 24, 24)
-    style = (f"FontName=DejaVu Sans,Fontsize={size},PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-             "BorderStyle=1,Outline=2.4,Shadow=0,Alignment=2,MarginV=64")
+    style = (f"FontName=DejaVu Sans,Fontsize={CAPTION_FONT_SIZE},PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
+             f"BorderStyle=1,Outline=2.4,Shadow=0,Alignment=2,MarginV={CAPTION_MARGIN_V}")
     captioned = work / "captioned.mp4"
     try:
         # cwd=work + a bare relative filename: the subtitles filter's own option parser mishandles an escaped
@@ -497,7 +500,7 @@ def run(spec: dict) -> dict:
 
     # ---- captions (opt-in; burns real transcribed speech, never faked)
     stage("captions", "in_progress")
-    if plan["captions"] and not add_captions(final, work, h):
+    if plan["captions"] and not add_captions(final, work):
         warnings.append("captions_unavailable")
     stage("captions", "completed")
 

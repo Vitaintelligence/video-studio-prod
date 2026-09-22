@@ -217,6 +217,28 @@ def test_captions_are_really_burned_in_not_just_reported(client, upload_asset, r
             break
     assert changed, "no sampled frame in the lower third differed between the captioned and uncaptioned renders"
 
+    # Regression: an earlier Fontsize (scaled from the video's pixel height, like drawtext's) rendered ~4x too
+    # large on a portrait video and covered nearly the entire frame in one-word-per-line text (checked visually
+    # against a live render). libass' ASS Fontsize is not scaled like that; verify captions stay a caption, not
+    # a takeover, by bounding how much of the frame's *height* actually has caption-sized text drawn on it.
+    # Scans only the bottom half (where Alignment=2 + a small MarginV places captions) so the fixture's own
+    # white-on-black timecode overlay near the top of the frame is never mistaken for caption text.
+    w_out, h_out = 720, 1280  # DIMS["9:16"] in local_edit_runner.py - the edit's default aspect ratio
+    lower_half_h = h_out // 2
+    for t in sample_points:
+        proc = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(t), "-i", str(cap_out), "-vframes", "1",
+                               "-vf", f"crop={w_out}:{lower_half_h}:0:{lower_half_h}",
+                               "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], capture_output=True, check=True)
+        frame = np.frombuffer(proc.stdout, dtype=np.uint8)
+        if frame.size != w_out * lower_half_h * 3:
+            continue
+        rgb = frame.reshape(lower_half_h, w_out, 3)
+        near_white_per_row = (rgb.min(axis=2) > 230).sum(axis=1)  # caption text is white-on-black-outline
+        text_rows = np.flatnonzero(near_white_per_row > w_out * 0.05)
+        if text_rows.size:  # nothing found just means this exact frame had no caption text on screen; try the next
+            span = (text_rows.max() - text_rows.min() + 1) / lower_half_h
+            assert span < 0.45, f"captions span {span:.0%} of the lower half at t={t:.1f}s - looks oversized"
+
 
 def test_captions_are_skipped_honestly_when_there_is_no_speech(client, upload_asset, real_engine):
     a = upload_asset(FIXTURE_VIDEO)  # a tone, no speech
