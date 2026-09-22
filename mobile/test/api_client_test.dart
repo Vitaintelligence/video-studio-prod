@@ -18,6 +18,27 @@ void main() {
     expect(ApiConfig.baseUrl, 'https://video-studio-prod-production.up.railway.app');
   });
 
+  test('Capabilities.captions reads features.captions honestly (false unless the backend actually reports it)', () {
+    expect(Capabilities.fromJson({'status': 'ok', 'generation_available': false}).captions, isFalse);
+    expect(Capabilities.fromJson({'status': 'ok', 'generation_available': false, 'features': {}}).captions, isFalse);
+    expect(
+      Capabilities.fromJson({
+        'status': 'ok',
+        'generation_available': false,
+        'features': {'captions': false},
+      }).captions,
+      isFalse,
+    );
+    expect(
+      Capabilities.fromJson({
+        'status': 'ok',
+        'generation_available': false,
+        'features': {'captions': true},
+      }).captions,
+      isTrue,
+    );
+  });
+
   test('API calls carry the bearer token; presigned uploads never do', () async {
     final backend = FakeBackend();
     final client = ApiClient(

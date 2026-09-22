@@ -28,6 +28,7 @@ class FakeBackend {
   bool variantsEnabled = true;
   bool revisionsEnabled = true;
   bool brollEnabled = false;
+  bool captionsEnabled = false;
 
   /// Holds running jobs at a fixed mid-progress state (for screenshots).
   bool freezeProgress = false;
@@ -195,7 +196,7 @@ class FakeBackend {
         'variants': variantsEnabled,
         'revisions': revisionsEnabled,
         'pipelines': [],
-        'features': {},
+        'features': {'captions': captionsEnabled},
         'limits': {'uploads': true},
       });
     }

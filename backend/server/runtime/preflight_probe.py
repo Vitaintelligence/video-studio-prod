@@ -11,7 +11,21 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
+
+
+def _ffmpeg_has_libass() -> bool:
+    """Whether the ffmpeg on PATH can burn in captions (the `subtitles` filter needs libass)."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    try:
+        proc = subprocess.run([ffmpeg, "-hide_banner", "-filters"], capture_output=True, text=True, timeout=20)
+    except Exception:
+        return False
+    return " subtitles " in proc.stdout
 
 
 def main() -> int:
@@ -33,6 +47,8 @@ def main() -> int:
             composition_runtimes=runtimes,
             warning_count=len(summary.get("runtime_warnings", [])),
             whisper=importlib.util.find_spec("faster_whisper") is not None,
+            opencv=importlib.util.find_spec("cv2") is not None,
+            libass=_ffmpeg_has_libass(),
         )
     except Exception as exc:  # report class only; details go to stderr
         out["error"] = type(exc).__name__

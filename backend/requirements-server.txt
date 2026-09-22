@@ -17,3 +17,5 @@ PyYAML>=6.0
 claude-agent-sdk==0.2.157
 # Speech-to-text for best-take selection (word timestamps). Model is pre-downloaded in the image.
 faster-whisper==1.2.1
+# Face detection for smart auto-crop (Haar cascade, bundled with the wheel; no network, no model download).
+opencv-python-headless==4.11.0.86

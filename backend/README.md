@@ -156,6 +156,33 @@ video -> speech-to-text with word timestamps (faster-whisper, local)
 - Limits: v1 assumes one speaker; it judges from the transcript and audio, not from what is on screen (no visual take
   scoring yet); non-English quality depends on the Whisper model size.
 
+## Automatic clean-up: audio, framing, captions
+
+Every deterministic edit (`server/runtime/local_edit_runner.py`) also gets, with no extra instruction needed:
+
+- **Audio clean-up.** A light noise/rumble filter (`highpass` + `afftdn`) on every segment with real audio, then one
+  loudness-normalisation pass (`loudnorm`) across the finished timeline - steadier than normalising each short
+  segment on its own.
+- **Face-aware framing.** Before reframing to the target aspect ratio, one OpenCV (Haar cascade) pass per source
+  clip looks for the speaker's face and, if it finds a steady one, centres the crop on it (biased toward the upper
+  third) instead of a blind geometric centre crop. No face found, too unstable across samples, or OpenCV not
+  installed -> falls back to today's centre crop. Never raises; framing only ever degrades gracefully.
+
+Captions are opt-in (the instruction must ask for them - `server/services/edit_planner.py`'s `_RE_CAPTIONS`):
+transcribes the *finished* cut (faster-whisper), groups word timestamps into short cues, and burns them in with
+FFmpeg's `subtitles` filter (needs libass; standard in Debian's ffmpeg package, confirmed at every worker boot -
+see `preflight_probe.py`). No speech, no libass, or the burn-in fails -> the `captions_unavailable` warning is
+added and the video is served uncaptioned; a caption request is never silently faked.
+
+`GET /v1/capabilities` reports `audio_cleanup` and `smart_crop` (true whenever `editing` is, since both are plain
+FFmpeg/OpenCV with no external key) and `features.captions` (true only when the worker's ffmpeg actually reports
+`libass`, not just because an unused upstream OpenMontage tool happens to be installed).
+
+Known limits: face detection is a Haar cascade (opencv-python-headless), not the fancier ML models OpenMontage
+also ships (mediapipe) - weaker in poor lighting or at an angle, and untested here against a real face (only
+synthetic fixtures); it's a static crop per source clip, not frame-by-frame tracking. Caption line-breaking is a
+simple greedy word-wrap and can occasionally leave a short orphan line.
+
 ## Deploying to Railway
 
 Topology: `Postgres` + `Redis` (private) + `api` (public domain, health check `/health`) + `worker` (no domain).

@@ -60,6 +60,9 @@ class Capabilities {
 
   /// The backend has no clip-extraction capability yet; stays false until it reports one.
   final bool videoToClips;
+
+  /// Real caption burn-in (not just an installed-but-unused tool). Gates the "Add captions" suggestion.
+  final bool captions;
   final bool uploads;
   final String status;
 
@@ -70,6 +73,7 @@ class Capabilities {
     this.variants = false,
     this.revisions = false,
     this.videoToClips = false,
+    this.captions = false,
     this.uploads = false,
     this.status = 'unknown',
   });
@@ -80,6 +84,7 @@ class Capabilities {
 
   factory Capabilities.fromJson(Map<String, dynamic> j) {
     final limits = j['limits'] is Map ? Map<String, dynamic>.from(j['limits'] as Map) : const <String, dynamic>{};
+    final features = j['features'] is Map ? Map<String, dynamic>.from(j['features'] as Map) : const <String, dynamic>{};
     return Capabilities(
       editing: j['editing'] == true,
       aiBroll: j['ai_broll'] == true,
@@ -87,6 +92,7 @@ class Capabilities {
       variants: j['variants'] == true,
       revisions: j['revisions'] == true,
       videoToClips: j['video_to_clips'] == true,
+      captions: features['captions'] == true,
       uploads: limits['uploads'] == true,
       status: _str(j['status']) ?? 'unknown',
     );

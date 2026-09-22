@@ -343,7 +343,7 @@ def test_capabilities_unknown_then_published(client, fake_redis, env):
 
     raw = {"registry_ok": True, "capabilities": {"video_generation": {"configured": 1, "total": 26},
            "tts": {"configured": 1, "total": 10}, "subtitle": {"configured": 2, "total": 2}},
-           "composition_runtimes": {"ffmpeg": True}}
+           "composition_runtimes": {"ffmpeg": True}, "libass": True}  # captions need ffmpeg's libass, not the (unused) upstream tool
     fake_redis.set(SNAPSHOT_KEY, json.dumps(normalize(raw, env["settings"])))
     r = client.get("/v1/capabilities").json()
     assert r["generation_available"] is True

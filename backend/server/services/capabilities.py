@@ -66,7 +66,9 @@ def normalize(raw: dict[str, Any], settings: Settings) -> dict[str, Any]:
         "text_to_video": _configured(caps, "video_generation"),
         "image_generation": _configured(caps, "image_generation"),
         "tts": _configured(caps, "tts"),
-        "captions": _configured(caps, "subtitle"),
+        # Whether OUR pipeline can actually burn in captions (needs ffmpeg's libass), not just whether an
+        # unused upstream OpenMontage tool happens to be installed.
+        "captions": bool(raw.get("libass")),
         "music": _configured(caps, "music_generation") or _configured(caps, "music_search"),
         "stock_video": _configured(caps, "clip_acquisition"),
     }
@@ -94,6 +96,8 @@ def normalize(raw: dict[str, Any], settings: Settings) -> dict[str, Any]:
         "revisions": editing,
         "best_takes": editing and bool(raw.get("whisper")),  # transcription available on the worker
         "takes_llm": bool(settings.openrouter_api_key and settings.openrouter_editing_model and settings.takes_llm_enabled),
+        "audio_cleanup": editing,  # noise/rumble reduction + loudness normalisation: pure FFmpeg, always on
+        "smart_crop": editing and bool(raw.get("opencv")),  # face-aware reframing; falls back to a centre crop
         "pipelines": [{"id": pid, "enabled": pid in pipelines_enabled and available} for pid in pipelines_enabled],
         "features": features,
         "generated_at": int(time.time()),
@@ -146,6 +150,8 @@ def capabilities_document(redis_client, settings: Settings | None = None) -> dic
             "revisions": False,
             "best_takes": False,
             "takes_llm": False,
+            "audio_cleanup": False,
+            "smart_crop": False,
             "pipelines": [{"id": pid, "enabled": False} for pid in enabled_pipelines()],
             "features": {k: False for k in ("text_to_video", "image_generation", "tts", "captions", "music", "stock_video")},
             "limits": base_limits,

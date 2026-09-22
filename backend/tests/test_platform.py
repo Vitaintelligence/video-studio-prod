@@ -73,6 +73,10 @@ def test_openmontage_registry_preflight_real_engine():
     doc = normalize(raw, settings)
     assert set(doc) >= {"status", "generation_available", "pipelines", "features"}
     assert doc["pipelines"][0]["id"] == "app-cinematic"
+    # opencv-python-headless and ffmpeg's libass are both real, installed dependencies now (requirements-server.txt) -
+    # a false report here would silently hide smart-crop / captions from the app even though they work.
+    assert raw["opencv"] is True and raw["libass"] is True
+    assert doc["smart_crop"] is True and doc["features"]["captions"] is True
 
 
 def test_app_pipeline_manifest_is_headless_and_valid():

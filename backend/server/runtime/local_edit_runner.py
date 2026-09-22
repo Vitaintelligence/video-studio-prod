@@ -2,7 +2,8 @@
 
 Uses OpenMontage's `video_trimmer` tool (cut / speed / concat) for the timeline operations and
 plain FFmpeg for the parts OpenMontage has no dedicated tool for here (silence detection,
-reframing/normalising, drawtext hook + CTA). No network, no provider keys, no LLM.
+face-aware reframing, speech cleanup + loudness normalisation, drawtext hook + CTA, caption
+burn-in). No network, no provider keys, no LLM.
 
     python -m server.runtime.local_edit_runner < spec.json      (cwd = engine dir)
 
@@ -11,7 +12,9 @@ stdout: JSON lines. Final line: {"event":"result","ok":bool,...}. Never prints p
 
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -32,6 +35,16 @@ OPENING_SECONDS = 4.0
 OPENING_SPEED = 1.3
 MIN_KEEP = 0.4
 CTA_SECONDS = 2.0
+# Rumble + noise-floor reduction, applied to every segment with real audio. Loudness is normalised once, on the
+# whole finished timeline (see run()), which is steadier than normalising each short segment separately.
+# Mirrors OpenMontage's own audio_enhance "noise_reduce" preset (openmontage/tools/audio/audio_enhance.py),
+# minus its per-clip loudnorm.
+SPEECH_CLEANUP_FILTER = "highpass=f=80,afftdn=nf=-25:nt=w"
+FINAL_LOUDNORM_FILTER = "loudnorm=I=-16:LRA=11:TP=-1.5"
+# Caption cue grouping (word-level timestamps -> short on-screen lines).
+CAPTION_MAX_CHARS = 42
+CAPTION_MAX_SECONDS = 3.2
+CAPTION_GAP_SECONDS = 0.45
 
 
 class EditError(Exception):
@@ -88,6 +101,76 @@ def keep_ranges(duration: float, silences: list[tuple[float, float]], pad: float
     if duration - cursor >= MIN_KEEP:
         keeps.append((cursor, duration))
     return keeps or [(0.0, duration)]
+
+
+def _scaled_frame_size(src_w: int, src_h: int, target_w: int, target_h: int) -> tuple[int, int]:
+    """The frame size ffmpeg's `scale=w:h:force_original_aspect_ratio=increase` step produces, just before crop."""
+    src_ratio, target_ratio = src_w / src_h, target_w / target_h
+    if src_ratio > target_ratio:
+        return round(target_h * src_ratio), target_h
+    return target_w, round(target_w / src_ratio)
+
+
+def _crop_offset_for_face(rel_cx: float, rel_cy: float, src_w: int, src_h: int, target_w: int, target_h: int) -> tuple[int, int]:
+    scaled_w, scaled_h = _scaled_frame_size(src_w, src_h, target_w, target_h)
+    face_x, face_y = rel_cx * scaled_w, rel_cy * scaled_h
+    crop_x = int(round(face_x - target_w / 2))
+    crop_y = int(round(face_y - target_h * 0.35))  # bias toward the upper third, where a talking head usually sits
+    crop_x = max(0, min(crop_x, scaled_w - target_w))
+    crop_y = max(0, min(crop_y, scaled_h - target_h))
+    return crop_x, crop_y
+
+
+def detect_face_crop_offset(path: Path, meta: dict, target_w: int, target_h: int,
+                            sample_fps: float = 1.5, max_samples: int = 40) -> tuple[int, int] | None:
+    """Best-effort: find the speaker's face and return a crop offset (in the scaled-frame coordinate space just
+    described) that keeps them in frame, instead of a blind centre crop. Returns None - plain centre crop,
+    today's behaviour - when OpenCV isn't installed, no face is found, or its position looks unreliable (jumps
+    around too much to be one steady face). Never raises: framing degrades gracefully, it never breaks the edit."""
+    src_w, src_h = meta.get("width"), meta.get("height")
+    if not src_w or not src_h:
+        return None
+    if _scaled_frame_size(src_w, src_h, target_w, target_h) == (target_w, target_h):
+        return None  # already the target aspect ratio: no crop margin exists for any face position to shift
+    try:
+        import cv2
+    except ImportError:
+        return None
+    try:
+        cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        if cascade.empty():
+            return None
+        cap = cv2.VideoCapture(str(path))
+        if not cap.isOpened():
+            return None
+        try:
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            interval = max(1, round(fps / sample_fps))
+            centers: list[tuple[float, float]] = []
+            frame_idx, max_frames = 0, interval * max_samples * 3  # bounds total decode time even with 0 faces found
+            while frame_idx < max_frames and len(centers) < max_samples:
+                ok, frame = cap.read()
+                if not ok:
+                    break
+                if frame_idx % interval == 0:
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+                    if len(faces):
+                        x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])  # the largest face found in this frame
+                        centers.append(((x + fw / 2) / gray.shape[1], (y + fh / 2) / gray.shape[0]))
+                frame_idx += 1
+        finally:
+            cap.release()
+    except Exception:
+        return None
+
+    if len(centers) < 5:
+        return None
+    xs, ys = sorted(c[0] for c in centers), sorted(c[1] for c in centers)
+    if xs[-1] - xs[0] > 0.4 or ys[-1] - ys[0] > 0.4:  # too unstable to trust - probably false positives, not one face
+        return None
+    rel_cx, rel_cy = xs[len(xs) // 2], ys[len(ys) // 2]  # median: robust to a stray false positive
+    return _crop_offset_for_face(rel_cx, rel_cy, src_w, src_h, target_w, target_h)
 
 
 @dataclass
@@ -201,21 +284,107 @@ def find_font(workdir: Path) -> str | None:
 
 
 def normalize(src: Path, dst: Path, w: int, h: int, has_audio: bool, speed: float = 1.0, fade_seconds: float = 0.0,
-              out_len: float = 0.0) -> None:
-    """Reframe (centre-crop) + fps/pixel-format/audio normalisation so segments concat losslessly.
-    `speed` is applied here only for silent sources (video_trimmer's speed op always filters audio)."""
+              out_len: float = 0.0, crop_xy: tuple[int, int] | None = None) -> None:
+    """Reframe (face-aware crop when `crop_xy` is given, else centred) + fps/pixel-format/audio normalisation so
+    segments concat losslessly. `speed` is applied here only for silent sources (video_trimmer's speed op always
+    filters audio). Real audio gets a light noise/rumble cleanup pass here; the whole timeline is loudness-
+    normalised once at the end (see run()) rather than each short segment separately, which is steadier."""
     pre = f"setpts=PTS/{speed:.4f}," if abs(speed - 1.0) > 1e-3 else ""
-    vf = f"{pre}scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},setsar=1,fps=30,format=yuv420p"
+    crop = f"crop={w}:{h}:{crop_xy[0]}:{crop_xy[1]}" if crop_xy else f"crop={w}:{h}"
+    vf = f"{pre}scale={w}:{h}:force_original_aspect_ratio=increase,{crop},setsar=1,fps=30,format=yuv420p"
     cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(src)]
     if not has_audio:
         cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
     cmd += ["-vf", vf]
+    af_parts = [SPEECH_CLEANUP_FILTER] if has_audio else []
     if fade_seconds > 0 and out_len > 4 * fade_seconds:  # tiny fades stop clicks where speech cuts are joined
-        cmd += ["-af", f"afade=t=in:d={fade_seconds},afade=t=out:st={out_len - fade_seconds:.3f}:d={fade_seconds}"]
+        af_parts.append(f"afade=t=in:d={fade_seconds},afade=t=out:st={out_len - fade_seconds:.3f}:d={fade_seconds}")
+    if af_parts:
+        cmd += ["-af", ",".join(af_parts)]
     cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-c:a", "aac", "-ar", "44100", "-ac", "2"]
     cmd += ["-shortest"] if not has_audio else []
     cmd += [str(dst)]
     ff(cmd)
+
+
+def build_caption_cues(words: list[dict]) -> list[dict]:
+    """Groups word-level timestamps into short on-screen caption lines (breaks on a pause, a length cap, or a
+    duration cap - never mid-word)."""
+    cues: list[dict] = []
+    cur: list[dict] = []
+    for w in words:
+        text = str(w.get("text", "")).strip()
+        if not text:
+            continue
+        start, end = float(w["start"]), float(w["end"])
+        if cur:
+            gap = start - cur[-1]["end"]
+            joined_len = len(" ".join(c["text"] for c in cur)) + 1 + len(text)
+            too_long = (end - cur[0]["start"] > CAPTION_MAX_SECONDS) or (joined_len > CAPTION_MAX_CHARS)
+            if gap > CAPTION_GAP_SECONDS or too_long:
+                cues.append({"start": cur[0]["start"], "end": cur[-1]["end"], "text": " ".join(c["text"] for c in cur)})
+                cur = []
+        cur.append({"text": text, "start": start, "end": end})
+    if cur:
+        cues.append({"start": cur[0]["start"], "end": cur[-1]["end"], "text": " ".join(c["text"] for c in cur)})
+    return cues
+
+
+def _srt_timestamp(seconds: float) -> str:
+    ms = round(max(seconds, 0.0) * 1000)
+    h, ms = divmod(ms, 3_600_000)
+    m, ms = divmod(ms, 60_000)
+    s, ms = divmod(ms, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def write_srt(cues: list[dict], path: Path) -> None:
+    lines: list[str] = []
+    for i, c in enumerate(cues, start=1):
+        lines += [str(i), f"{_srt_timestamp(c['start'])} --> {_srt_timestamp(c['end'])}", c["text"], ""]
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _escape_filter_path(path: str) -> str:
+    """Escape a path for use as an FFmpeg filter option value (e.g. `subtitles=<path>`). Same class of problem as
+    `_escape_lavfi_movie_path` in openmontage/tools/analysis/scene_detect.py. Not used for captions.srt itself
+    (add_captions sidesteps it entirely with a relative filename + cwd, the same trick make_end_card/the hook
+    drawtext use for font.ttf/hook.txt/cta.txt) - a Windows `C:\\...` path defeats even a `\\:`-escaped colon
+    inside the subtitles filter's own option parser. Kept for any future caller that cannot use a relative path."""
+    if "'" in path:
+        raise EditError("path contains an unsupported character")
+    return path.replace("\\", "/").replace(":", r"\:")
+
+
+def add_captions(final: Path, work: Path, h: int) -> bool:
+    """Transcribes the finished cut and burns in real captions. Returns False (video left untouched) on any
+    failure - no speech, no ffmpeg subtitle support, anything - so a caption request is never silently faked."""
+    if importlib.util.find_spec("faster_whisper") is None:
+        return False
+    try:
+        from tools.analysis.take_analyzer import transcribe_words
+
+        transcript = transcribe_words(final, os.environ.get("TRANSCRIBE_MODEL", "base"), os.environ.get("TRANSCRIBE_LANGUAGE") or None)
+    except Exception:
+        return False
+    cues = build_caption_cues([{"text": w["word"], "start": w["start"], "end": w["end"]} for w in transcript.get("word_timestamps", [])])
+    if not cues:
+        return False
+    write_srt(cues, work / "captions.srt")
+    size = max(h // 24, 24)
+    style = (f"FontName=DejaVu Sans,Fontsize={size},PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
+             "BorderStyle=1,Outline=2.4,Shadow=0,Alignment=2,MarginV=64")
+    captioned = work / "captioned.mp4"
+    try:
+        # cwd=work + a bare relative filename: the subtitles filter's own option parser mishandles an escaped
+        # drive-letter colon in an absolute Windows path, so this sidesteps the problem rather than fighting it.
+        ff(["ffmpeg", "-y", "-v", "error", "-i", str(final), "-vf", f"subtitles=captions.srt:force_style='{style}'",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-c:a", "copy", "-movflags", "+faststart", str(captioned)],
+           cwd=work)
+    except EditError:
+        return False
+    os.replace(captioned, final)
+    return True
 
 
 def make_end_card(dst: Path, text: str, w: int, h: int, workdir: Path, font: str | None) -> None:
@@ -259,6 +428,10 @@ def run(spec: dict) -> dict:
     silences = {str(p): detect_silences(p) for p, m in sources if plan["remove_silence"] and m["has_audio"]}
     if plan["remove_silence"] and not silences:
         warnings.append("pause_removal_skipped_no_audio")
+    # One face-detection pass per source (not per cut segment): cheaper, and every segment from the same
+    # recording then shares one steady crop instead of jittering between takes.
+    crop_offsets = {str(p): detect_face_crop_offset(p, m, w, h) for p, m in sources}
+    any_audio = any(m["has_audio"] for _, m in sources)
     stage("analyze", "completed")
 
     # ---- plan
@@ -291,7 +464,8 @@ def run(spec: dict) -> dict:
                 silent_speed = s.speed
         norm = work / f"s{i:03d}_n.mp4"
         normalize(cur, norm, w, h, has_audio=has_audio, speed=silent_speed,
-                  fade_seconds=0.015 if explicit else 0.0, out_len=s.out_len)
+                  fade_seconds=0.015 if explicit else 0.0, out_len=s.out_len,
+                  crop_xy=None if s.is_broll else crop_offsets.get(str(s.src)))
         parts.append(str(norm))
     font = find_font(work)
     if plan["cta_text"]:
@@ -301,22 +475,29 @@ def run(spec: dict) -> dict:
     joined = work / "joined.mp4"
     trim({"operation": "concat", "segments": [{"input_path": p} for p in parts], "output_path": str(joined)})
 
+    # One loudness pass across the whole finished timeline (steadier than normalising each short segment alone).
+    final_af = FINAL_LOUDNORM_FILTER if any_audio else None
     if plan.get("hook_text") and font:
         (work / "hook.txt").write_text(plan["hook_text"], encoding="utf-8")
         size = max(h // 20, 30)
         draw = (f"drawtext=textfile=hook.txt:fontfile={font}:fontsize={size}:fontcolor=white:borderw=4:bordercolor=black:"
                 f"x=(w-text_w)/2:y=h*0.12:enable='lt(t,3)'")
-        ff(["ffmpeg", "-y", "-v", "error", "-i", "joined.mp4", "-vf", draw, "-c:v", "libx264", "-preset", "veryfast",
-            "-crf", "21", "-c:a", "copy", "-movflags", "+faststart", str(final)], cwd=work)
+        cmd = ["ffmpeg", "-y", "-v", "error", "-i", "joined.mp4", "-vf", draw]
+        cmd += ["-af", final_af, "-c:a", "aac"] if final_af else ["-c:a", "copy"]
+        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-movflags", "+faststart", str(final)]
+        ff(cmd, cwd=work)
     else:
         if plan.get("hook_text") and not font:
             warnings.append("hook_text_skipped_no_font")
-        ff(["ffmpeg", "-y", "-v", "error", "-i", str(joined), "-c", "copy", "-movflags", "+faststart", str(final)])
+        cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(joined), "-c:v", "copy"]
+        cmd += ["-af", final_af, "-c:a", "aac"] if final_af else ["-c:a", "copy"]
+        cmd += ["-movflags", "+faststart", str(final)]
+        ff(cmd)
     stage("edit", "completed")
 
-    # ---- captions (needs speech-to-text; not silently faked)
+    # ---- captions (opt-in; burns real transcribed speech, never faked)
     stage("captions", "in_progress")
-    if plan["captions"]:
+    if plan["captions"] and not add_captions(final, work, h):
         warnings.append("captions_unavailable")
     stage("captions", "completed")
 

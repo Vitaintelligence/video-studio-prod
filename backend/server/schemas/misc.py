@@ -73,6 +73,8 @@ class CapabilitiesOut(BaseModel):
     revisions: bool = False
     best_takes: bool = False
     takes_llm: bool = False
+    audio_cleanup: bool = False
+    smart_crop: bool = False
     pipelines: list[dict]
     features: dict[str, bool]
     limits: dict

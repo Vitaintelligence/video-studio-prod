@@ -169,7 +169,8 @@ class _Intro extends StatelessWidget {
         const Text('Turn messy footage into a tighter ad.', style: AppTypography.display),
         const SizedBox(height: AppSpacing.sm),
         const Text(
-          'AdCut finds your strongest takes, shows every cut, and gets you to a share-ready video faster.',
+          'AdCut finds your strongest takes, cleans up the audio, keeps you framed, and shows every cut '
+          'so you get to a share-ready video faster.',
           style: AppTypography.bodySecondary,
         ),
         const SizedBox(height: AppSpacing.xl),

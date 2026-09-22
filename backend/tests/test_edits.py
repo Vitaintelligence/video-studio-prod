@@ -159,6 +159,14 @@ def test_capabilities_expose_product_features(client, fake_redis, env):
     assert caps["editing"] is True and caps["variants"] is True and caps["revisions"] is True
     assert caps["ai_broll"] is False and caps["video_generation"] is False  # no OpenRouter configured
     assert caps["limits"]["uploads"] is True
+    assert caps["audio_cleanup"] is True  # pure FFmpeg: on whenever editing is, no extra dependency
+    assert caps["smart_crop"] is False  # no `opencv` reported by this probe -> honestly unavailable
+    assert caps["features"]["captions"] is False  # no `libass` reported by this probe -> honestly unavailable
+
+    raw2 = {**raw, "opencv": True, "libass": True}
+    fake_redis.set(SNAPSHOT_KEY, json.dumps(normalize(raw2, env["settings"])))
+    caps2 = client.get("/v1/capabilities").json()
+    assert caps2["smart_crop"] is True and caps2["features"]["captions"] is True
 
 
 def test_edit_creation_blocked_only_when_worker_says_editing_unavailable(client, upload_asset, fake_redis):

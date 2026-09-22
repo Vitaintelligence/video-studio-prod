@@ -22,12 +22,13 @@ class _SuggestionText {
 }
 
 /// Suggestions the backend's edit planner understands. Tapping one fills the composer.
+/// "Add captions" is listed separately below: it's gated by capabilities.captions, the rest are not.
 const _suggestions = [
   _SuggestionText('Shorter', 'Make it shorter and tighter.'),
   _SuggestionText('Stronger hook', 'Make the opening faster and punchier.'),
   _SuggestionText('Remove more pauses', 'Remove more awkward pauses.'),
-  _SuggestionText('Add captions', 'Add bold captions.'),
 ];
+const _captionsSuggestion = _SuggestionText('Add captions', 'Add bold captions.');
 
 /// Adjust: the player, a compact version selector, and Prompt-to-Edit. Each instruction makes a new version.
 class AdjustView extends ConsumerStatefulWidget {
@@ -142,6 +143,11 @@ class _AdjustViewState extends ConsumerState<AdjustView> {
                   spacing: AppSpacing.xs,
                   children: [
                     for (final q in _suggestions) _Suggestion(label: q.label, onTap: () => _addSuggestion(q.text)),
+                    if (capabilities?.captions ?? false)
+                      _Suggestion(
+                        label: _captionsSuggestion.label,
+                        onTap: () => _addSuggestion(_captionsSuggestion.text),
+                      ),
                     if (capabilities?.aiBroll ?? false)
                       _Suggestion(
                         label: 'Add B-roll',

@@ -141,7 +141,24 @@ void main() {
     await settle(tester, steps: 10);
     await tester.tap(find.text('Adjust'));
     await settle(tester);
+    expect(find.text('Add captions'), findsNothing); // the backend did not report the captions capability
     await shot(tester, 'adjust_standard');
+    await unmount(tester);
+  });
+
+  testWidgets('adjust: the "Add captions" suggestion only appears when the backend reports the capability', (
+    tester,
+  ) async {
+    final h = await seeded();
+    h.backend.captionsEnabled = true;
+    await pumpApp(tester, h, location: '/edits/edit-1');
+    await settle(tester, steps: 10);
+    await tester.tap(find.text('Adjust'));
+    await settle(tester);
+    expect(find.text('Add captions'), findsOneWidget);
+    await tester.tap(find.text('Add captions'));
+    await settle(tester);
+    expect(find.textContaining('Add bold captions.'), findsOneWidget); // tapping it fills the composer
     await unmount(tester);
   });
 
