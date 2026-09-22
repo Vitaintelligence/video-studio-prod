@@ -7,6 +7,7 @@ import '../../app/providers.dart';
 import '../../app/routes.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/design/app_colors.dart';
+import '../../core/design/app_motion.dart';
 import '../../core/design/app_radius.dart';
 import '../../core/design/app_spacing.dart';
 import '../../core/design/app_typography.dart';
@@ -114,9 +115,14 @@ class _ResultViewState extends ConsumerState<ResultView> {
     final keptRanges = shown.keptRanges.isNotEmpty ? shown.keptRanges : job.keptRanges;
     final slices = rawSeconds == null ? const <CutSlice>[] : buildCutSlices(rawSeconds, keptRanges);
     final removed = slices.where((slice) => !slice.kept).map((slice) => slice.range).toList();
+    // Insights describe the job returned by the API, not every entry in its version list.
+    // Omit them while viewing another version rather than attributing the latest claims to it.
+    final shownInsights = shown.id == job.id ? job.insights : const <String, Object>{};
+    final hasChanges = removed.isNotEmpty || verifiedEditChanges(shownInsights).isNotEmpty;
     final selected = removed.any((range) => _sameRange(range, _selectedRemoved)) ? _selectedRemoved : null;
     final saving = _activeExport == ExportTarget.photos;
     final compactLabels = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final changeDuration = AppMotion.allowed(context, AppMotion.standard);
 
     return Column(
       children: [
@@ -159,17 +165,31 @@ class _ResultViewState extends ConsumerState<ResultView> {
                     : () => _export(shown.outputUrl!, shown.version, ExportTarget.photos),
                 downloadProgress: saving ? _exportProgress : null,
               ),
-              if (rawSeconds != null && keptRanges.isNotEmpty) ...[
+              if (hasChanges) ...[
                 const SizedBox(height: AppSpacing.lg),
                 _Section(
-                  child: CutTimeline(
-                    totalSeconds: rawSeconds,
-                    keptRanges: keptRanges,
-                    selected: selected,
-                    onRemovedTap: (range) => setState(() {
-                      _selectedRemoved = range;
-                      _showRaw = false;
-                    }),
+                  child: AnimatedSwitcher(
+                    duration: changeDuration,
+                    switchInCurve: AppMotion.enter,
+                    switchOutCurve: AppMotion.exit,
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(begin: AppMotion.gentleRise, end: Offset.zero).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: EditChangesSummary(
+                      key: ValueKey(shown.id),
+                      insights: shownInsights,
+                      totalSeconds: rawSeconds,
+                      keptRanges: keptRanges,
+                      selected: selected,
+                      onRemovedTap: (range) => setState(() {
+                        _selectedRemoved = range;
+                        _showRaw = false;
+                      }),
+                    ),
                   ),
                 ),
               ],

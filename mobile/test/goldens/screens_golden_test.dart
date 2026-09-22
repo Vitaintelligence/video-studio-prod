@@ -18,6 +18,7 @@ Future<Harness> seeded({bool frozen = false, Map<String, Object> prefs = const {
   final h = await Harness.create(prefs: prefs);
   h.backend.assets['asset-1'] = {'id': 'asset-1', 'status': 'uploaded'};
   final e = h.backend.newEditForTest('Remove awkward pauses and dead air. Keep the pacing tight.');
+  e['insights'] = {'retakes_removed': 2, 'off_script_removed': 1};
   h.backend.edits[e['id'] as String]!['status'] = frozen ? 'running' : 'completed';
   h.backend.freezeProgress = frozen;
   return h;

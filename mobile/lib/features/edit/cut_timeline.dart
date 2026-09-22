@@ -17,6 +17,45 @@ class CutSlice {
   final bool kept;
 }
 
+class VerifiedEditChange {
+  const VerifiedEditChange({required this.label, required this.icon});
+
+  final String label;
+  final IconData icon;
+}
+
+/// User-facing claims backed by explicit, truthy result insights.
+///
+/// Keep this allow-list narrow: new backend metadata must not become product
+/// copy accidentally. In particular, a caption request is not proof that the
+/// finished version contains captions; the current API does not report that
+/// successful outcome explicitly.
+List<VerifiedEditChange> verifiedEditChanges(Map<String, Object> insights) => [
+  if (_isTruthy(insights['retakes_removed']))
+    VerifiedEditChange(
+      label: _countedClaim(insights['retakes_removed'], singular: 'retake removed', plural: 'retakes removed'),
+      icon: CupertinoIcons.repeat,
+    ),
+  if (_isTruthy(insights['off_script_removed']))
+    VerifiedEditChange(
+      label: _countedClaim(
+        insights['off_script_removed'],
+        singular: 'off-script moment removed',
+        plural: 'off-script moments removed',
+      ),
+      icon: CupertinoIcons.text_badge_xmark,
+    ),
+];
+
+bool _isTruthy(Object? value) => value == true || (value is num && value > 0);
+
+String _countedClaim(Object? value, {required String singular, required String plural}) {
+  if (value is! num) return plural;
+  final count = value.toInt();
+  if (count <= 0) return plural;
+  return '$count ${count == 1 ? singular : plural}';
+}
+
 List<CutSlice> buildCutSlices(double totalSeconds, List<CutRange> ranges) {
   if (totalSeconds <= 0) return const [];
   final kept =
@@ -66,6 +105,106 @@ List<CutSlice> buildCutSlices(double totalSeconds, List<CutRange> ranges) {
   return slices;
 }
 
+class EditChangesSummary extends StatelessWidget {
+  const EditChangesSummary({
+    super.key,
+    required this.insights,
+    required this.totalSeconds,
+    required this.keptRanges,
+    required this.selected,
+    required this.onRemovedTap,
+  });
+
+  final Map<String, Object> insights;
+  final double? totalSeconds;
+  final List<CutRange> keptRanges;
+  final CutRange? selected;
+  final ValueChanged<CutRange> onRemovedTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final changes = verifiedEditChanges(insights);
+    final slices = totalSeconds == null ? const <CutSlice>[] : buildCutSlices(totalSeconds!, keptRanges);
+    final removed = slices.where((slice) => !slice.kept).length;
+    if (changes.isEmpty && removed == 0) return const SizedBox.shrink();
+
+    return Semantics(
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: const BoxDecoration(color: AppColors.surfaceRaised, borderRadius: AppRadius.largeAll),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                _SummaryIcon(),
+                SizedBox(width: AppSpacing.sm),
+                Expanded(child: Text('What AdCut changed', style: AppTypography.heading)),
+              ],
+            ),
+            if (changes.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [for (final change in changes) _ChangeFact(change: change)],
+              ),
+            ],
+            if (removed > 0 && totalSeconds != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              const DecoratedBox(
+                decoration: BoxDecoration(color: AppColors.divider),
+                child: SizedBox(height: 1),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              CutTimeline(
+                totalSeconds: totalSeconds!,
+                keptRanges: keptRanges,
+                selected: selected,
+                onRemovedTap: onRemovedTap,
+                showTitle: false,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryIcon extends StatelessWidget {
+  const _SummaryIcon();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: AppSpacing.xxxl,
+    height: AppSpacing.xxxl,
+    decoration: const BoxDecoration(color: AppColors.accentSoft, borderRadius: AppRadius.mediumAll),
+    child: const Icon(CupertinoIcons.checkmark_alt, size: AppSpacing.lg, color: AppColors.accentText),
+  );
+}
+
+class _ChangeFact extends StatelessWidget {
+  const _ChangeFact({required this.change});
+
+  final VerifiedEditChange change;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+    decoration: const BoxDecoration(color: AppColors.surface, borderRadius: AppRadius.mediumAll),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(change.icon, size: AppSpacing.md, color: AppColors.accentSecondary),
+        const SizedBox(width: AppSpacing.xs),
+        Text(change.label, style: AppTypography.caption.copyWith(color: AppColors.textPrimary)),
+      ],
+    ),
+  );
+}
+
 class CutTimeline extends StatelessWidget {
   const CutTimeline({
     super.key,
@@ -73,12 +212,14 @@ class CutTimeline extends StatelessWidget {
     required this.keptRanges,
     required this.selected,
     required this.onRemovedTap,
+    this.showTitle = true,
   });
 
   final double totalSeconds;
   final List<CutRange> keptRanges;
   final CutRange? selected;
   final ValueChanged<CutRange> onRemovedTap;
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -92,16 +233,29 @@ class CutTimeline extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            runSpacing: AppSpacing.xxs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              const Text('What AdCut changed', style: AppTypography.heading),
-              Text('$removed removed', style: AppTypography.caption.copyWith(color: AppColors.destructive)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
+          if (showTitle) ...[
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              runSpacing: AppSpacing.xxs,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('What AdCut changed', style: AppTypography.heading),
+                Text('$removed removed', style: AppTypography.caption.copyWith(color: AppColors.destructive)),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ] else ...[
+            Row(
+              children: [
+                const Expanded(child: Text('Cut review', style: AppTypography.label)),
+                Text(
+                  '$removed ${removed == 1 ? 'cut' : 'cuts'}',
+                  style: AppTypography.caption.copyWith(color: AppColors.destructive),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
           SizedBox(
             height: 44,
             child: Row(

@@ -75,6 +75,24 @@ void main() {
   });
 
   group('raw vs cut', () {
+    test('result claims are limited to explicit truthy insights', () {
+      final job = EditJob.fromJson({
+        'id': 'edit-1',
+        'status': 'completed',
+        'insights': {'retakes_removed': 2, 'off_script_removed': 1, 'unrelated_internal_metric': 99},
+      });
+      expect(verifiedEditChanges(job.insights).map((change) => change.label), [
+        '2 retakes removed',
+        '1 off-script moment removed',
+      ]);
+      expect(verifiedEditChanges({'retakes_removed': 0, 'off_script_removed': false}), isEmpty);
+      expect(
+        verifiedEditChanges({'captions_requested': true}),
+        isEmpty,
+        reason: 'a request is not proof that captions were added',
+      );
+    });
+
     test('cut timeline derives the real removed gaps from kept source ranges', () {
       final slices = buildCutSlices(20, const [
         CutRange(source: 0, start: 2, end: 7),

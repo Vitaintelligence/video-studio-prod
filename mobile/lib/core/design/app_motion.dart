@@ -6,7 +6,9 @@ abstract final class AppMotion {
   static const Duration standard = Duration(milliseconds: 240);
   static const Duration expressive = Duration(milliseconds: 420);
   static const Curve enter = Curves.easeOutCubic;
+  static const Curve exit = Curves.easeInCubic;
   static const Curve emphasis = Curves.easeOutBack;
+  static const Offset gentleRise = Offset(0, 0.04);
 
   static Duration allowed(BuildContext context, Duration duration) =>
       (MediaQuery.maybeOf(context)?.disableAnimations ?? false) ? Duration.zero : duration;
