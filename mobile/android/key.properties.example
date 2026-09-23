@@ -1,0 +1,7 @@
+# Copy to key.properties (same directory) and fill in real values. key.properties is git-ignored -
+# it must never be committed. See ../README.md "Release build (Android)" for how this file is produced
+# and where the signing keystore itself is stored.
+storePassword=
+keyPassword=
+keyAlias=adcut-upload
+storeFile=upload-keystore.jks

@@ -1,5 +1,5 @@
 name: adcut_mobile
-description: "A new Flutter project."
+description: "AdCut: AI video editing for UGC / short-form / performance content."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -57,6 +57,20 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # Generates every launcher icon size (Android incl. adaptive icons, iOS) from one source image.
+  # Drop the logo at assets/icon/icon.png (see assets/icon/README.md) then run:
+  #   dart run flutter_launcher_icons
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
+  # A second, background-only layer for Android's adaptive icon system (Android 8+): the launcher masks
+  # icon.png to shape (circle/squircle/etc per device), so it must have no transparency reaching the edges.
+  adaptive_icon_background: "#08090E" # AppColors.background (lib/core/design/app_colors.dart) - keep in sync
+  adaptive_icon_foreground: "assets/icon/icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
